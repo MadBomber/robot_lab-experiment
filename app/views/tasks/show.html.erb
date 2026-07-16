@@ -4,7 +4,7 @@
 <pre class="bg-gray-50 border rounded p-4 mb-6 whitespace-pre-wrap"><%= @doc_content.presence || "(empty)" %></pre>
 
 <h2 class="text-lg font-semibold mb-2">Transcript</h2>
-<turbo_stream_from "task_#{@task.id}" />
+<%= turbo_stream_from "task_#{@task.id}" %>
 <div id="transcript" class="border rounded p-4 space-y-2 max-h-96 overflow-y-auto">
   <%= render partial: "messages/message", collection: @messages, as: :message %>
 </div>
