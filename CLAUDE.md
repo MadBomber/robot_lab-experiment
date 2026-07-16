@@ -28,6 +28,8 @@ No RSpec — this app uses Minitest with fixtures (`test/fixtures/*.yml`), not f
 
 `Gemfile.local` (loaded via `eval_gemfile "Gemfile"`, actually used by `bundle install`/`bin/*`) points `robot_lab` and `robot_lab-rails` at `../robot_lab` and `../robot_lab-rails` — sibling checkouts in this same `robot_lab_project` workspace. If a robot_lab API doesn't behave as expected, the fix may belong in the sibling gem, not here. See `../CLAUDE.md` (one level up) for the multi-gem workspace map.
 
+**GitHub Actions CI is intentionally disabled** — the workflow file is committed as `.github/workflows/ci.yml.disabled` (a `.disabled` suffix so Actions won't pick it up), NOT `ci.yml`. Do not re-enable it. CI runs on GitHub's runner against the plain `Gemfile`, which does **not** include `robot_lab`/`robot_lab-rails` (those are local `path:` gems declared only in `Gemfile.local`, pointing at sibling checkouts that don't exist on the runner). With them absent, `RobotLab` is an undefined constant and every tool test errors out. CI can only work once `robot_lab`/`robot_lab-rails` are published as released gems. Until then, run `bin/ci` locally (which uses `Gemfile.local`) as the pre-push check instead.
+
 ## Architecture: the pipeline state machine
 
 The whole orchestration lives in two small services, deliberately kept separate from each other and from everything else:

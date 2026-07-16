@@ -1,4 +1,4 @@
-inherit_from: .rubocop_todo.yml
+inherit_from: ../.rubocop-base.yml
 
 # Rails-generated boilerplate this app doesn't hand-author.
 AllCops:
@@ -7,5 +7,3 @@ AllCops:
     - 'bin/**/*'
     - 'config/**/*'
     - 'vendor/**/*'
-    - 'Procfile'
-    - 'Procfile.dev'
