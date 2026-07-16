@@ -36,7 +36,7 @@ class PrStatusServiceTest < ActiveSupport::TestCase
     task = build_task(branch_name: "task/42-my-task")
 
     payload = { "url" => "https://github.com/example/repo/pull/42", "state" => "OPEN" }.to_json
-    Open3.stub(:capture3, ->(*_args, **_kwargs) do
+    Open3.stub(:capture3, lambda do |*_args, **_kwargs|
       [payload, "", Struct.new(:success?).new(true)]
     end) do
       result = PrStatusService.call(task)
@@ -49,7 +49,7 @@ class PrStatusServiceTest < ActiveSupport::TestCase
     task = build_task(branch_name: "task/10-closed-pr")
 
     payload = { "url" => "https://github.com/example/repo/pull/10", "state" => "CLOSED" }.to_json
-    Open3.stub(:capture3, ->(*_args, **_kwargs) do
+    Open3.stub(:capture3, lambda do |*_args, **_kwargs|
       [payload, "", Struct.new(:success?).new(true)]
     end) do
       result = PrStatusService.call(task)
@@ -61,7 +61,7 @@ class PrStatusServiceTest < ActiveSupport::TestCase
   test "returns fallback when gh pr view returns failure exit status" do
     task = build_task(branch_name: "task/42-my-task")
 
-    Open3.stub(:capture3, ->(*_args, **_kwargs) do
+    Open3.stub(:capture3, lambda do |*_args, **_kwargs|
       ["", "no pull request found for branch", Struct.new(:success?).new(false)]
     end) do
       result = PrStatusService.call(task)
@@ -73,7 +73,7 @@ class PrStatusServiceTest < ActiveSupport::TestCase
   test "returns fallback when gh raises Errno::ENOENT (not installed)" do
     task = build_task(branch_name: "task/42-my-task")
 
-    Open3.stub(:capture3, ->(*_args, **_kwargs) do
+    Open3.stub(:capture3, lambda do |*_args, **_kwargs|
       raise Errno::ENOENT, "gh"
     end) do
       result = PrStatusService.call(task)
@@ -85,7 +85,7 @@ class PrStatusServiceTest < ActiveSupport::TestCase
   test "returns fallback when gh returns success but malformed JSON" do
     task = build_task(branch_name: "task/42-my-task")
 
-    Open3.stub(:capture3, ->(*_args, **_kwargs) do
+    Open3.stub(:capture3, lambda do |*_args, **_kwargs|
       ["not json at all", "", Struct.new(:success?).new(true)]
     end) do
       result = PrStatusService.call(task)
