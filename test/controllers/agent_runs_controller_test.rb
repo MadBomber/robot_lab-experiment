@@ -28,4 +28,12 @@ class AgentRunsControllerTest < ActionDispatch::IntegrationTest
     assert_redirected_to project_task_url(@project, @task)
     assert_equal "An agent is already running for this task.", flash[:alert]
   end
+
+  test "redirects with an alert when agent_type is invalid" do
+    post project_task_agent_runs_url(@project, @task), params: { agent_type: "yolo" }
+
+    assert_redirected_to project_task_url(@project, @task)
+    assert_equal "Invalid agent type: yolo", flash[:alert]
+    assert_not @task.reload.running_agent_run.present?
+  end
 end
