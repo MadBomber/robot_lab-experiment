@@ -1,6 +1,11 @@
 require "active_support/core_ext/integer/time"
 
 Rails.application.configure do
+  # Use Solid Queue for ActiveJob in development to match production behavior.
+  # Running via `bin/dev` now launches a separate `worker: bin/jobs` process that
+  # consumes jobs durably from the database, matching how we deploy.
+  config.active_job.queue_adapter = :solid_queue
+
   # Settings specified here will take precedence over those in config/application.rb.
 
   # Make code changes take effect immediately without server restart.
