@@ -17,6 +17,11 @@ Current PR status: <%= pr_status %>
   branch and nothing was uncommitted, there is nothing to submit -- call
   mark_pr_complete immediately and stop. Otherwise push the branch and open a PR
   (`gh pr create`) with a short title and a concise summary referencing the task.
+- Check the task doc's "## Original Request" section for a GitHub issue URL (it
+  looks like "(from https://github.com/OWNER/REPO/issues/N)" -- present whenever
+  this task was created from an issue). If one is present, include a closing
+  keyword for that issue number in the PR body (e.g. "Closes #N") so GitHub
+  auto-closes it when the PR is merged. If no issue URL is present, omit this.
 
 ## Step 2 -- drive CI green
 
