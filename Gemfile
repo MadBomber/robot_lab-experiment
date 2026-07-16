@@ -54,6 +54,9 @@ group :development, :test do
   gem "rubocop", require: false
   gem "rubocop-rails", require: false
   gem "reek", require: false
+
+  # Separate mock library for minitest 6.x (minitest/mock no longer bundled)
+  gem "minitest-mock", require: false
 end
 
 group :development do
