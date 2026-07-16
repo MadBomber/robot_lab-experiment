@@ -97,4 +97,25 @@ class AgentRunJobTest < ActiveSupport::TestCase
     assert(captured.any?(MarkWorkflowBlockedTool))
     assert_empty captured.grep(MarkPlanningCompleteTool)
   end
+
+  test "gives the audit agent issue-filing tools, no completion tools" do
+    audit_run = AgentRun.create!(
+      task: @task,
+      conversation: Conversation.create!(task: @task, provider: "ollama", model: "qwen3.6:latest", started_at: Time.current),
+      agent_type: "audit",
+      status: "running"
+    )
+
+    captured = nil
+    RobotLab.stub(:build, lambda { |**kwargs|
+      captured = kwargs[:local_tools]
+      FakeRobot.new(**kwargs)
+    }) do
+      AgentRunJob.perform_now(audit_run.id)
+    end
+
+    assert(captured.any?(ListGithubIssuesTool))
+    assert(captured.any?(CreateGithubIssueTool))
+    assert_empty captured.grep(TaskCompletionTool)
+  end
 end

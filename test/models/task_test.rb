@@ -95,4 +95,18 @@ class TaskTest < ActiveSupport::TestCase
     task.unblock!
     assert_not task.blocked?
   end
+
+  test "task_kind defaults to fix" do
+    task = Task.create!(project: @project, title: "Do the thing")
+    assert task.fix?
+  end
+
+  test "runnable_agent_types for an audit task offers audit once, then nothing" do
+    task = Task.create!(project: @project, title: "Self-audit", task_kind: "audit")
+    assert_equal ["audit"], task.runnable_agent_types
+
+    conversation = Conversation.create!(task:, provider: "ollama", model: "qwen3.6:latest", started_at: Time.current)
+    AgentRun.create!(task:, conversation:, agent_type: "audit", status: "completed")
+    assert_equal [], task.runnable_agent_types
+  end
 end

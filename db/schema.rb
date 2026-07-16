@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_16_042658) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_16_183000) do
   create_table "agent_runs", force: :cascade do |t|
     t.string "agent_type", null: false
     t.integer "conversation_id", null: false
@@ -64,6 +64,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_16_042658) do
     t.boolean "pr_agent_complete", default: false, null: false
     t.integer "project_id", null: false
     t.string "status", default: "pending", null: false
+    t.string "task_kind", default: "fix", null: false
     t.string "title", null: false
     t.datetime "updated_at", null: false
     t.boolean "workflow_complete", default: false, null: false

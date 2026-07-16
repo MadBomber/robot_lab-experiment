@@ -22,6 +22,17 @@ class AgentRunCompletionHandlerTest < ActiveSupport::TestCase
     assert_equal 0, task.agent_runs.where.not(id: run.id).count
   end
 
+  test "audit finishing always stops, even if other flags would otherwise chain" do
+    task = build_task(workflow_complete: true, task_kind: "audit")
+    run = finished_run(task, "audit")
+
+    result = AgentRunCompletionHandler.call(run)
+
+    assert_equal :stopped_after_audit, result.action
+    assert_nil result.next_agent_run
+    assert_equal 0, task.agent_runs.where.not(id: run.id).count
+  end
+
   test "implementation finishing with no flags chains to review" do
     task = build_task
     run = finished_run(task, "implementation")

@@ -14,6 +14,7 @@ Rails.application.routes.draw do
       resources :agent_runs, only: [:create]
       post :unblock, on: :member
     end
+    resources :audit_tasks, only: [:create]
   end
 
   # Defines the root path route ("/")

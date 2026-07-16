@@ -9,6 +9,7 @@ class Task < ApplicationRecord
 
   enum :status, { pending: "pending", in_progress: "in_progress", in_review: "in_review", completed: "completed" },
        default: "pending"
+  enum :task_kind, { fix: "fix", audit: "audit" }, default: "fix"
 
   validates :title, presence: true
   validates :blocked_reason, inclusion: { in: BLOCKED_REASONS }, allow_nil: true
@@ -35,6 +36,7 @@ class Task < ApplicationRecord
   # handler reads, so the UI never has its own separate notion of state.
   def runnable_agent_types
     return [] if running_agent_run || pr_agent_complete? || blocked?
+    return audit_runnable_types if audit?
     return ["planning"] unless planning_complete?
     return ["implementation"] unless workflow_complete?
 
@@ -43,5 +45,11 @@ class Task < ApplicationRecord
 
   def unblock!
     update!(blocked_reason: nil)
+  end
+
+  private
+
+  def audit_runnable_types
+    agent_runs.audit.exists? ? [] : ["audit"]
   end
 end

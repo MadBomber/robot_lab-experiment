@@ -18,6 +18,7 @@ class AgentRunCompletionHandler
   def call
     return no_chain(:failed_no_chain) if @agent_run.failed?
     return no_chain(:stopped_after_planning) if @agent_run.planning?
+    return no_chain(:stopped_after_audit) if @agent_run.audit?
 
     if @task.workflow_complete?
       return no_chain(:already_complete) if @task.pr_agent_complete?

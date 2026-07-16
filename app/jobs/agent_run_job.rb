@@ -62,6 +62,7 @@ class AgentRunJob < ApplicationJob
     when "implementation" then doc_tools + implementation_tools(cwd)
     when "review" then doc_tools + review_tools(cwd, task)
     when "pr" then doc_tools + pr_tools(cwd, task)
+    when "audit" then doc_tools + audit_tools(cwd)
     end
   end
 
@@ -85,5 +86,10 @@ class AgentRunJob < ApplicationJob
 
   def pr_tools(cwd, task)
     [BashTool.new(cwd:), MarkPrCompleteTool.new(task:)]
+  end
+
+  def audit_tools(cwd)
+    [ReadFileTool.new(cwd:), GlobTool.new(cwd:), GrepTool.new(cwd:),
+     ListGithubIssuesTool.new(cwd:), CreateGithubIssueTool.new(cwd:)]
   end
 end

@@ -20,9 +20,9 @@ class AgentRunTest < ActiveSupport::TestCase
     assert run.pending?
   end
 
-  test "only recognizes the four core agent types" do
+  test "only recognizes the known agent types" do
     run = AgentRun.new(task: @task, conversation: @conversation)
-    assert_equal %w[planning implementation review pr], AgentRun.agent_types.keys
+    assert_equal %w[planning implementation review pr audit], AgentRun.agent_types.keys
     assert_raises(ArgumentError) { run.agent_type = "yolo" }
   end
 end
