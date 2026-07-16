@@ -60,6 +60,7 @@ class TasksControllerTest < ActionDispatch::IntegrationTest
     task = Task.create!(project: @project, title: "Add login")
     get project_task_url(@project, task)
     assert_response :success
+    assert_select "turbo-cable-stream-source", count: 1
   end
 
   test "unblock clears blocked_reason and redirects back to the task" do
