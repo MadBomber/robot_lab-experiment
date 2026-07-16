@@ -1,0 +1,10 @@
+1	app/controllers/audit_tasks_controller.rb
+1	app/controllers/projects_controller.rb
+3	app/controllers/tasks_controller.rb
+3	app/jobs/agent_run_job.rb
+1	app/services/agent_run_completion_handler.rb
+1	app/services/pr_status_service.rb
+2	app/services/transcript_recorder.rb
+1	app/services/worktree_service.rb
+2	app/tools/edit_file_tool.rb
+2	app/tools/grep_tool.rb

@@ -2,5 +2,8 @@
 require_relative "../config/boot"
 require "bundler/audit/cli"
 
-ARGV.concat %w[ --config config/bundler-audit.yml ] if ARGV.empty? || ARGV.include?("check")
+# This app bundles via Gemfile.local (see .envrc's BUNDLE_GEMFILE), so the
+# lockfile bundler-audit needs to scan is Gemfile.local.lock, not the
+# gem's own default of Gemfile.lock -- which doesn't exist here.
+ARGV.concat %w[ --config config/bundler-audit.yml --gemfile_lock Gemfile.local.lock ] if ARGV.empty? || ARGV.include?("check")
 Bundler::Audit::CLI.start

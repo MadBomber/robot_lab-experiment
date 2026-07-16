@@ -35,6 +35,14 @@
 
 .byebug_history
 
+# Quality-gate scratch output (asgard quality) -- .quality/reek_baseline.txt
+# itself IS committed; it's the persistent grandfather record, not scratch.
+flay_output.txt
+flog_output.txt
+reek_output.txt
+rubocop_output.txt
+rails_best_practices_output.json
+
 # Ignore node_modules.
 node_modules/
 

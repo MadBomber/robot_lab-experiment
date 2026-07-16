@@ -25,10 +25,10 @@ class WorktreeService
   end
 
   def remove
-    return if @task.worktree_path.blank?
+    return unless @task.worktree_path?
 
     run("git", "worktree", "remove", "--force", @task.worktree_path, chdir: @project.repo_folder_path)
-    run("git", "branch", "-D", @task.branch_name, chdir: @project.repo_folder_path) if @task.branch_name.present?
+    run("git", "branch", "-D", @task.branch_name, chdir: @project.repo_folder_path) if @task.branch_name?
   end
 
   private

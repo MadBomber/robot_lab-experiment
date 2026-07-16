@@ -39,6 +39,18 @@ gem "image_processing", "~> 1.2"
 group :development, :test do
   # See https://guides.rubyonrails.org/debugging_rails_applications.html#debugging-with-the-debug-gem
   gem "debug", platforms: %i[mri windows], require: "debug/prelude"
+
+  # Static analysis for security vulnerabilities [https://brakemanscanner.org/]
+  gem "brakeman", require: false
+
+  # Bundle audit that checks for CVEs in gem dependencies [https://github.com/rubysec/bundler-audit]
+  gem "bundler-audit", require: false
+
+  # Code complexity, structural duplication, and code smell checks (asgard quality)
+  gem "flay", require: false
+  gem "flog", require: false
+  gem "rails_best_practices", require: false
+  gem "reek", require: false
 end
 
 group :development do

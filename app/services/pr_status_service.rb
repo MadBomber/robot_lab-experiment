@@ -13,7 +13,7 @@ class PrStatusService
   end
 
   def call
-    return "No branch yet." if @task.branch_name.blank?
+    return "No branch yet." unless @task.branch_name?
 
     out, _err, status = Open3.capture3("gh", "pr", "view", @task.branch_name, "--json", "url,state",
                                        chdir: @task.effective_cwd)
