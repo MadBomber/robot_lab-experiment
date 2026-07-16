@@ -1,4 +1,3 @@
-inherit_from: ../.rubocop-base.yml
 
 # Rails-generated boilerplate this app doesn't hand-author.
 AllCops:

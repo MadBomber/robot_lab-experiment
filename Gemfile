@@ -29,6 +29,7 @@ gem "tzinfo-data", platforms: %i[windows jruby]
 gem "solid_cable"
 gem "solid_cache"
 gem "solid_queue"
+gem "ruby_llm"
 
 # Reduces boot times through caching; required in config/boot.rb
 gem "bootsnap", require: false
@@ -50,6 +51,8 @@ group :development, :test do
   gem "flay", require: false
   gem "flog", require: false
   gem "rails_best_practices", require: false
+  gem "rubocop", require: false
+  gem "rubocop-rails", require: false
   gem "reek", require: false
 end
 
