@@ -4,10 +4,11 @@ class TasksController < ApplicationController
 
   def new
     @task = @project.tasks.new
+    prefill_from_issue(params[:from_issue])
   end
 
   def create
-    @task = @project.tasks.new(title: task_params[:title])
+    @task = @project.tasks.new(title: task_params[:title], description: task_params[:description])
 
     ActiveRecord::Base.transaction do
       @task.save!
@@ -43,5 +44,15 @@ class TasksController < ApplicationController
 
   def task_params
     params.expect(task: %i[title description])
+  end
+
+  def prefill_from_issue(number)
+    return if number.blank?
+
+    issue = GithubIssueService.find(@project, number)
+    return unless issue
+
+    @task.title = issue.title
+    @task.description = "#{issue.body}\n\n(from #{issue.url})"
   end
 end

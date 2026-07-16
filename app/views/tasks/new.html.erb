@@ -11,6 +11,10 @@
     </div>
   <% end %>
 
+  <% if params[:from_issue].present? %>
+    <p class="text-sm text-gray-500 mb-2">Pre-filled from issue #<%= params[:from_issue] %> -- review before creating.</p>
+  <% end %>
+
   <%= form_with model: @task, url: project_tasks_path(@project), class: "space-y-4" do |f| %>
     <div>
       <%= f.label :title, class: "block font-medium" %>

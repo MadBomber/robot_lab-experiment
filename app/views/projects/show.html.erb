@@ -14,4 +14,20 @@
   <%= link_to "New task", new_project_task_path(@project), class: "inline-block bg-blue-600 text-white px-4 py-2 rounded" %>
   <%= button_to "Run self-audit", project_audit_tasks_path(@project),
         class: "inline-block bg-purple-600 text-white px-4 py-2 rounded ml-2" %>
+
+  <h2 class="text-lg font-semibold mb-2 mt-6">Open GitHub Issues</h2>
+  <% if @open_issues.present? %>
+    <ul class="divide-y divide-gray-200">
+      <% @open_issues.each do |issue| %>
+        <li class="py-3 flex items-center justify-between">
+          <%= link_to "##{issue.number} #{issue.title}", issue.url, target: "_blank", rel: "noopener",
+                class: "text-blue-600 hover:underline" %>
+          <%= link_to "Create task", new_project_task_path(@project, from_issue: issue.number),
+                class: "text-sm bg-gray-100 px-3 py-1 rounded" %>
+        </li>
+      <% end %>
+    </ul>
+  <% else %>
+    <p class="text-sm text-gray-500">No open issues.</p>
+  <% end %>
 </div>

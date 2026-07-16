@@ -35,6 +35,27 @@ class TasksControllerTest < ActionDispatch::IntegrationTest
     FileUtils.rm_rf(archive_root)
   end
 
+  test "new pre-fills title and description from a from_issue param" do
+    issue = GithubIssueService::Issue.new(number: 5, title: "Fix the thing", body: "Steps to reproduce...",
+                                          url: "https://github.com/x/y/issues/5")
+    GithubIssueService.stub(:find, ->(*_args) { issue }) do
+      get new_project_task_url(@project, from_issue: 5)
+    end
+
+    assert_response :success
+    assert_select "input#task_title[value=?]", "Fix the thing"
+    assert_select "textarea#task_description", text: /Steps to reproduce.../
+  end
+
+  test "new renders a blank form when the from_issue lookup fails" do
+    GithubIssueService.stub(:find, ->(*_args) {}) do
+      get new_project_task_url(@project, from_issue: 999)
+    end
+
+    assert_response :success
+    assert_select "input#task_title[value=?]", "Fix the thing", count: 0
+  end
+
   test "show renders the task doc and transcript" do
     task = Task.create!(project: @project, title: "Add login")
     get project_task_url(@project, task)

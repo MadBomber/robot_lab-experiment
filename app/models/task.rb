@@ -7,6 +7,10 @@ class Task < ApplicationRecord
   has_many :conversations, dependent: :destroy
   has_many :agent_runs, dependent: :destroy
 
+  # Not persisted -- only carries the New Task form's description through to
+  # TaskDocument.seed (and back to the form on a validation-error re-render).
+  attr_accessor :description
+
   enum :status, { pending: "pending", in_progress: "in_progress", in_review: "in_review", completed: "completed" },
        default: "pending"
   enum :task_kind, { fix: "fix", audit: "audit" }, default: "fix"

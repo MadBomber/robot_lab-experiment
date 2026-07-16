@@ -41,4 +41,17 @@ class ProjectsControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_select "a", text: task.title
   end
+
+  test "show lists open GitHub issues with a create-task link" do
+    project = Project.create!(name: "Demo", repo_folder_path: @repo_dir)
+    issue = GithubIssueService::Issue.new(number: 5, title: "Fix the thing", body: nil,
+                                          url: "https://github.com/x/y/issues/5")
+
+    GithubIssueService.stub(:list, ->(*_args) { [issue] }) do
+      get project_url(project)
+    end
+
+    assert_response :success
+    assert_select "a[href=?]", new_project_task_path(project, from_issue: 5), text: "Create task"
+  end
 end
