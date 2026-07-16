@@ -1,10 +1,23 @@
+# Development and production both use solid_cable (database-backed, cross-process).
+# The async adapter only delivers within a single process; because our jobs run in
+# a separate Solid Queue worker process (see Procfile.dev), the worker's Turbo Stream
+# broadcasts must travel through a cross-process backend to reach browsers connected
+# to Puma. solid_cable stores messages in the `cable` database (see database.yml).
 development:
-  adapter: async
+  adapter: solid_cable
+  connects_to:
+    database:
+      writing: cable
+  polling_interval: 0.1.seconds
+  message_retention: 1.day
 
 test:
   adapter: test
 
 production:
-  adapter: redis
-  url: <%= ENV.fetch("REDIS_URL") { "redis://localhost:6379/1" } %>
-  channel_prefix: robot_lab_experiment_production
+  adapter: solid_cable
+  connects_to:
+    database:
+      writing: cable
+  polling_interval: 0.1.seconds
+  message_retention: 1.day
