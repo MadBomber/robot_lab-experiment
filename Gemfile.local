@@ -1,0 +1,16 @@
+# frozen_string_literal: true
+
+eval_gemfile "Gemfile"
+
+# Cross-gem development: local robot_lab checkouts.
+gem "robot_lab", path: "../robot_lab"
+gem "robot_lab-rails", path: "../robot_lab-rails"
+
+group :development, :test do
+  gem "rubocop"
+end
+
+group :test do
+  # Minitest 6 split Mock out of the default library.
+  gem "minitest-mock"
+end

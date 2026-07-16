@@ -1,0 +1,25 @@
+<div class="w-full max-w-lg">
+  <h1 class="text-2xl font-bold mb-4">New task in <%= @project.name %></h1>
+
+  <% if @task.errors.any? %>
+    <div class="bg-red-50 text-red-700 p-3 rounded mb-4">
+      <ul>
+        <% @task.errors.full_messages.each do |message| %>
+          <li><%= message %></li>
+        <% end %>
+      </ul>
+    </div>
+  <% end %>
+
+  <%= form_with model: @task, url: project_tasks_path(@project), class: "space-y-4" do |f| %>
+    <div>
+      <%= f.label :title, class: "block font-medium" %>
+      <%= f.text_field :title, class: "border rounded w-full p-2" %>
+    </div>
+    <div>
+      <%= f.label :description, "Describe the work (becomes the task doc's original request)", class: "block font-medium" %>
+      <%= f.text_area :description, rows: 6, class: "border rounded w-full p-2" %>
+    </div>
+    <%= f.submit "Create task", class: "bg-blue-600 text-white px-4 py-2 rounded" %>
+  <% end %>
+</div>

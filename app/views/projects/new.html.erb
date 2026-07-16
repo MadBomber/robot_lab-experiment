@@ -1,0 +1,29 @@
+<div class="w-full max-w-lg">
+  <h1 class="text-2xl font-bold mb-4">New project</h1>
+
+  <% if @project.errors.any? %>
+    <div class="bg-red-50 text-red-700 p-3 rounded mb-4">
+      <ul>
+        <% @project.errors.full_messages.each do |message| %>
+          <li><%= message %></li>
+        <% end %>
+      </ul>
+    </div>
+  <% end %>
+
+  <%= form_with model: @project, class: "space-y-4" do |f| %>
+    <div>
+      <%= f.label :name, class: "block font-medium" %>
+      <%= f.text_field :name, class: "border rounded w-full p-2" %>
+    </div>
+    <div>
+      <%= f.label :repo_folder_path, "Repository path (an existing git checkout)", class: "block font-medium" %>
+      <%= f.text_field :repo_folder_path, class: "border rounded w-full p-2" %>
+    </div>
+    <div>
+      <%= f.label :subproject_path, "Subproject path (optional, for monorepos)", class: "block font-medium" %>
+      <%= f.text_field :subproject_path, class: "border rounded w-full p-2" %>
+    </div>
+    <%= f.submit "Create project", class: "bg-blue-600 text-white px-4 py-2 rounded" %>
+  <% end %>
+</div>

@@ -1,0 +1,13 @@
+<div class="message message-<%= message.msg_type %>" id="message_<%= message.id %>">
+  <span class="message-type"><%= message.msg_type %></span>
+  <% case message.msg_type %>
+  <% when "assistant", "assistant_thinking", "user", "system" %>
+    <pre><%= message.payload["text"] || message.payload["content"] %></pre>
+  <% when "tool_use" %>
+    <pre><%= message.payload["tool_name"] %>(<%= message.payload["tool_input"] %>)</pre>
+  <% when "tool_result" %>
+    <pre><%= message.payload["content"] %></pre>
+  <% else %>
+    <pre><%= message.payload %></pre>
+  <% end %>
+</div>

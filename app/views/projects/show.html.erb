@@ -1,0 +1,15 @@
+<div class="w-full max-w-2xl">
+  <h1 class="text-2xl font-bold mb-1"><%= @project.name %></h1>
+  <p class="text-gray-500 text-sm mb-4"><%= @project.effective_cwd %></p>
+
+  <ul class="divide-y divide-gray-200 mb-6">
+    <% @tasks.each do |task| %>
+      <li class="py-3 flex items-center justify-between">
+        <%= link_to task.title, [@project, task], class: "text-blue-600 hover:underline" %>
+        <span class="text-xs uppercase text-gray-500"><%= task.status %></span>
+      </li>
+    <% end %>
+  </ul>
+
+  <%= link_to "New task", new_project_task_path(@project), class: "inline-block bg-blue-600 text-white px-4 py-2 rounded" %>
+</div>

@@ -1,0 +1,31 @@
+<div class="w-full max-w-4xl">
+  <p class="text-sm text-gray-500 mb-1"><%= link_to @project.name, @project %></p>
+  <h1 class="text-2xl font-bold mb-1"><%= @task.title %></h1>
+  <p class="text-sm text-gray-500 mb-4">
+    status: <%= @task.status %>
+    &middot; runs: <%= @task.workflow_run_count %>/<%= Task::MAX_WORKFLOW_RUNS %>
+    <% if @task.blocked? %>
+      &middot; <span class="text-red-600 font-medium">blocked (<%= @task.blocked_reason %>)</span>
+    <% end %>
+  </p>
+
+  <div class="mb-6 space-x-2">
+    <% @task.runnable_agent_types.each do |agent_type| %>
+      <%= button_to "Run #{agent_type}", project_task_agent_runs_path(@project, @task),
+            params: { agent_type: agent_type }, class: "bg-blue-600 text-white px-4 py-2 rounded" %>
+    <% end %>
+    <% if @task.blocked? %>
+      <%= button_to "Unblock", unblock_project_task_path(@project, @task), method: :post,
+            class: "bg-amber-600 text-white px-4 py-2 rounded" %>
+    <% end %>
+  </div>
+
+  <h2 class="text-lg font-semibold mb-2">Task doc</h2>
+  <pre class="bg-gray-50 border rounded p-4 mb-6 whitespace-pre-wrap"><%= @doc_content.presence || "(empty)" %></pre>
+
+  <h2 class="text-lg font-semibold mb-2">Transcript</h2>
+  <%= turbo_stream_from "task_#{@task.id}" %>
+  <div id="transcript" class="border rounded p-4 space-y-2 max-h-96 overflow-y-auto">
+    <%= render partial: "messages/message", collection: @messages, as: :message %>
+  </div>
+</div>
