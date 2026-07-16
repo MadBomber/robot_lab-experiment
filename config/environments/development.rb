@@ -4,7 +4,10 @@ Rails.application.configure do
   # Use Solid Queue for ActiveJob in development to match production behavior.
   # Running via `bin/dev` now launches a separate `worker: bin/jobs` process that
   # consumes jobs durably from the database, matching how we deploy.
+  # Solid Queue's tables live in their own `queue` database (see database.yml),
+  # loaded from db/queue_schema.rb -- same as production.
   config.active_job.queue_adapter = :solid_queue
+  config.solid_queue.connects_to = { database: { writing: :queue } }
 
   # Settings specified here will take precedence over those in config/application.rb.
 
