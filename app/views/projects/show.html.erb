@@ -11,9 +11,16 @@
     <% end %>
   </ul>
 
-  <%= link_to "New task", new_project_task_path(@project), class: "inline-block bg-blue-600 text-white px-4 py-2 rounded" %>
-  <%= button_to "Run self-audit", project_audit_tasks_path(@project),
-        class: "inline-block bg-purple-600 text-white px-4 py-2 rounded ml-2" %>
+  <div class="flex gap-2 mb-6">
+    <%= link_to "Edit", edit_project_path(@project), class: "inline-block bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded" %>
+    <%= button_to "Delete project", project_path(@project), method: :delete,
+          data: { turbo_confirm: "This will delete all tasks, worktrees, and archived docs for #{@project.name}.\n\nAre you sure?" },
+          class: "inline-block bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded",
+          form_class: "inline" %>
+    <%= link_to "New task", new_project_task_path(@project), class: "inline-block bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded" %>
+    <%= button_to "Run self-audit", project_audit_tasks_path(@project),
+          class: "inline-block bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded ml-2", form_class: "inline" %>
+  </div>
 
   <h2 class="text-lg font-semibold mb-2 mt-6">Open GitHub Issues</h2>
   <% if @open_issues.present? %>

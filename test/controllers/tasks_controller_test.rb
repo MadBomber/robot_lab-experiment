@@ -68,4 +68,25 @@ class TasksControllerTest < ActionDispatch::IntegrationTest
     assert_redirected_to project_task_url(@project, task)
     assert_not task.reload.blocked?
   end
+
+  test "destroy removes worktree and archive" do
+    archive_root = Dir.mktmpdir("archive_root")
+    previous_env = ENV.fetch("ROBOT_LAB_EXPERIMENT_ARCHIVE_ROOT", nil)
+    ENV["ROBOT_LAB_EXPERIMENT_ARCHIVE_ROOT"] = archive_root
+
+    create_url = project_tasks_url(@project)
+    post create_url, params: { task: { title: "Remove me", description: "will be destroyed" } }
+    task = @project.tasks.sole
+
+    assert Dir.exist?(task.worktree_path)
+    assert File.exist?(TaskDocument.doc_path(task))
+
+    delete project_task_url(@project, task)
+    assert_redirected_to project_url(@project)
+    refute Task.exists?(task.id)
+    refute Dir.exist?(task.worktree_path)
+  ensure
+    ENV["ROBOT_LAB_EXPERIMENT_ARCHIVE_ROOT"] = previous_env
+    FileUtils.rm_rf(archive_root) if defined?(archive_root)
+  end
 end

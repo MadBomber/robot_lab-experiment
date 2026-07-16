@@ -1,6 +1,6 @@
 class TasksController < ApplicationController
   before_action :set_project
-  before_action :set_task, only: %i[show unblock]
+  before_action :set_task, only: %i[show destroy unblock]
 
   def new
     @task = @project.tasks.new
@@ -25,6 +25,15 @@ class TasksController < ApplicationController
   def show
     @doc_content = TaskDocument.read(@task)
     @messages = Message.where(conversation_id: @task.conversation_ids).order(:created_at, :seq)
+  end
+
+  def destroy
+    WorktreeService.new(@task).remove
+    TaskDocument.delete_archive(@task)
+    @task.destroy!
+    redirect_to @project, notice: "Task '#{@task.title}' deleted."
+  rescue => e
+    redirect_to @project, alert: "Could not delete task: #{e.message}"
   end
 
   def unblock
