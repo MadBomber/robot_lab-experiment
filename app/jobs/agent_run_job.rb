@@ -22,6 +22,7 @@ class AgentRunJob < ApplicationJob
   private
 
   def run_turn(agent_run, task, conversation, recorder)
+    recorder.start
     robot = build_robot(agent_run, task, conversation, recorder)
     # Robot#run has its own `tools: :none` default, independent of local_tools
     # passed to RobotLab.build -- without this, the chat's tool list gets
@@ -31,6 +32,8 @@ class AgentRunJob < ApplicationJob
   rescue StandardError => e
     agent_run.update!(status: "failed")
     Rails.logger.error("AgentRunJob##{agent_run.id} (#{agent_run.agent_type}) failed: #{e.class}: #{e.message}")
+  ensure
+    recorder.finish
   end
 
   def build_robot(agent_run, task, conversation, recorder)

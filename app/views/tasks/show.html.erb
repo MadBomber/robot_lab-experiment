@@ -9,6 +9,8 @@
     <% end %>
   </p>
 
+  <%= render "agent_status", running: @task.running_agent_run.present? %>
+
   <div class="mb-6 space-x-2">
     <% @task.runnable_agent_types.each do |agent_type| %>
       <%= button_to "Run #{agent_type}", project_task_agent_runs_path(@project, @task),

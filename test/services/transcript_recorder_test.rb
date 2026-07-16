@@ -17,8 +17,12 @@ class TranscriptRecorderTest < ActiveSupport::TestCase
     FileUtils.remove_entry(@repo_dir)
   end
 
-  test "record_content persists an assistant message with the chunk text" do
-    @recorder.record_content(FakeChunk.new("hello", nil))
+  test "record_content buffers deltas and flushes one assistant message on finish" do
+    @recorder.record_content(FakeChunk.new("hel", nil))
+    @recorder.record_content(FakeChunk.new("lo", nil))
+    assert_equal 0, @conversation.messages.count
+
+    @recorder.finish
 
     message = @conversation.messages.sole
     assert message.assistant?
@@ -27,30 +31,74 @@ class TranscriptRecorderTest < ActiveSupport::TestCase
 
   test "record_content skips empty text chunks" do
     @recorder.record_content(FakeChunk.new("", nil))
+    @recorder.finish
     assert_equal 0, @conversation.messages.count
   end
 
-  test "record_content emits a separate assistant_thinking message when thinking text is present" do
-    @recorder.record_content(FakeChunk.new("answer", FakeThinking.new("reasoning here")))
+  test "thinking deltas are buffered and flushed as one message when content starts" do
+    @recorder.record_content(FakeChunk.new(nil, FakeThinking.new("rea")))
+    @recorder.record_content(FakeChunk.new(nil, FakeThinking.new("soning")))
+    @recorder.record_content(FakeChunk.new("answer", nil))
+    @recorder.finish
 
-    types = @conversation.messages.order(:seq).pluck(:msg_type)
-    assert_equal %w[assistant_thinking assistant], types
+    messages = @conversation.messages.order(:seq)
+    assert_equal %w[assistant_thinking assistant], messages.pluck(:msg_type)
+    assert_equal "reasoning", messages.first.payload["text"]
+    assert_equal "answer", messages.second.payload["text"]
   end
 
-  test "seq numbers are monotonic and continue across a fresh recorder for the same conversation" do
-    @recorder.record_content(FakeChunk.new("first", nil))
-    @recorder.record_content(FakeChunk.new("second", nil))
+  test "finish flushes trailing buffered thinking with nothing else forcing it" do
+    @recorder.record_content(FakeChunk.new(nil, FakeThinking.new("thinking")))
+    @recorder.finish
+
+    message = @conversation.messages.sole
+    assert message.assistant_thinking?
+    assert_equal "thinking", message.payload["text"]
+  end
+
+  test "thinking messages are persisted but never broadcast live" do
+    calls = []
+    Turbo::StreamsChannel.stub(:broadcast_append_to, ->(*_args, **kwargs) { calls << kwargs }) do
+      @recorder.record_content(FakeChunk.new(nil, FakeThinking.new("secret reasoning")))
+      @recorder.finish
+    end
+
+    assert_equal 1, @conversation.messages.count
+    assert(calls.none? { |kwargs| kwargs.dig(:locals, :message)&.assistant_thinking? })
+  end
+
+  test "start broadcasts the spinner on, finish broadcasts it off" do
+    calls = []
+    Turbo::StreamsChannel.stub(:broadcast_replace_to, ->(*_args, **kwargs) { calls << kwargs }) do
+      @recorder.start
+      @recorder.finish
+    end
+
+    assert_equal([true, false], calls.map { |kwargs| kwargs.dig(:locals, :running) })
+  end
+
+  test "seq numbers stay monotonic across flush boundaries and a fresh recorder" do
+    @recorder.record_content(FakeChunk.new(nil, FakeThinking.new("thinking")))
+    @recorder.record_tool_call(RubyLLM::ToolCall.new(id: "t1", name: "read_file", arguments: {}))
+    @recorder.record_tool_result("result")
+    @recorder.record_content(FakeChunk.new("answer", nil))
+    @recorder.finish
 
     fresh_recorder = TranscriptRecorder.new(@conversation.reload)
-    fresh_recorder.record_content(FakeChunk.new("third", nil))
+    fresh_recorder.record_content(FakeChunk.new("more", nil))
+    fresh_recorder.finish
 
-    assert_equal [1, 2, 3], @conversation.messages.order(:seq).pluck(:seq)
+    assert_equal [1, 2, 3, 4, 5], @conversation.messages.order(:seq).pluck(:seq)
   end
 
-  test "record_tool_call then record_tool_result pairs them via tool_use_id" do
+  test "record_tool_call flushes pending thinking before recording the tool call, and pairs via tool_use_id" do
+    @recorder.record_content(FakeChunk.new(nil, FakeThinking.new("deciding what to do")))
     tool_call = RubyLLM::ToolCall.new(id: "abc", name: "read_file", arguments: { path: "x.txt" })
     @recorder.record_tool_call(tool_call)
     @recorder.record_tool_result("file body")
+
+    types = @conversation.messages.order(:seq).pluck(:msg_type)
+    assert_equal %w[assistant_thinking tool_use tool_result], types
 
     tool_use = @conversation.messages.find_by(msg_type: "tool_use")
     tool_result = @conversation.messages.find_by(msg_type: "tool_result")
