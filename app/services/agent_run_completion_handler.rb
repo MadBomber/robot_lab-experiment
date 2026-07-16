@@ -16,25 +16,27 @@ class AgentRunCompletionHandler
   end
 
   def call
-    return no_chain(:failed_no_chain) if @agent_run.failed?
-    return no_chain(:stopped_after_planning) if @agent_run.planning?
-    return no_chain(:stopped_after_audit) if @agent_run.audit?
+    return no_chain_with_broadcast(:failed_no_chain) if @agent_run.failed?
+    return no_chain_with_broadcast(:stopped_after_planning) if @agent_run.planning?
+    return no_chain_with_broadcast(:stopped_after_audit) if @agent_run.audit?
 
     if @task.workflow_complete?
-      return no_chain(:already_complete) if @task.pr_agent_complete?
-
-      return start(:pr, :started_pr)
+      return no_chain_with_broadcast(:already_complete) if @task.pr_agent_complete?
+      return start_with_broadcast(:pr, :started_pr)
     end
 
-    return no_chain(:stopped_blocked) if @task.blocked?
+    return no_chain_with_broadcast(:stopped_blocked) if @task.blocked?
 
     if @task.iteration_cap_reached?
       @task.update!(blocked_reason: "max_iterations")
-      return no_chain(:blocked_max_iterations)
+      return no_chain_with_broadcast(:blocked_max_iterations)
     end
 
     next_type = @agent_run.implementation? ? :review : :implementation
-    start(next_type, next_type == :review ? :chained_to_review : :chained_to_implementation)
+    start_with_broadcast(
+      next_type,
+      next_type == :review ? :chained_to_review : :chained_to_implementation
+    )
   end
 
   private
@@ -48,5 +50,29 @@ class AgentRunCompletionHandler
 
   def no_chain(action)
     Result.new(action:, next_agent_run: nil)
+  end
+
+  # --- broadcasting helpers ---
+
+  def start_with_broadcast(agent_type, action)
+    result = start(agent_type, action)
+    broadcast_task_header(action, result.next_agent_run)
+    result
+  end
+
+  def no_chain_with_broadcast(action)
+    broadcast_task_header(action, nil)
+    no_chain(action)
+  end
+
+  def broadcast_task_header(action, next_agent_run)
+    return unless defined?(Turbo::StreamsChannel)
+
+    Turbo::StreamsChannel.broadcast_replace_to(
+      "task_#{@task.id}",
+      target: "task-header",
+      partial: "tasks/task_header",
+      locals: { task: @task, project: @task.project }
+    )
   end
 end
