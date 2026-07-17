@@ -4,13 +4,14 @@ class AgentRunJobTest < ActiveSupport::TestCase
   FakeChunk = Struct.new(:content, :thinking)
 
   class FakeRobot
-    attr_reader :on_content, :on_tool_call, :on_tool_result, :local_tools
+    attr_reader :on_content, :on_tool_call, :on_tool_result, :local_tools, :mcp_servers
 
-    def initialize(on_content:, on_tool_call:, on_tool_result:, local_tools:, **)
+    def initialize(on_content:, on_tool_call:, on_tool_result:, local_tools:, mcp_servers: [], **)
       @on_content = on_content
       @on_tool_call = on_tool_call
       @on_tool_result = on_tool_result
       @local_tools = local_tools
+      @mcp_servers = mcp_servers
     end
 
     def run(_message, **)
@@ -117,5 +118,61 @@ class AgentRunJobTest < ActiveSupport::TestCase
     assert(captured.any?(ListGithubIssuesTool))
     assert(captured.any?(CreateGithubIssueTool))
     assert_empty captured.grep(TaskCompletionTool)
+  end
+
+  # ---- MCP servers handed to RobotLab (which owns the client lifecycle) ----
+  # These stub at the RobotLab.build boundary and assert the mcp_servers: kwarg,
+  # rather than stubbing RubyLLM::MCP -- so they exercise the real integration
+  # point (RobotLab connects/injects/disconnects the MCP clients itself).
+
+  def review_run
+    AgentRun.create!(
+      task: @task,
+      conversation: Conversation.create!(task: @task, provider: "ollama", model: "qwen3.6:latest", started_at: Time.current),
+      agent_type: "review",
+      status: "running"
+    )
+  end
+
+  # Runs the job with McpConfigNormalizer.call stubbed and RobotLab.build stubbed,
+  # returning the mcp_servers: kwarg that reached RobotLab.build.
+  def captured_mcp_servers(run_id, normalizer:)
+    captured = :unset
+    McpConfigNormalizer.stub(:call, normalizer) do
+      RobotLab.stub(:build, lambda { |**kwargs|
+        captured = kwargs[:mcp_servers]
+        FakeRobot.new(**kwargs)
+      }) do
+        AgentRunJob.perform_now(run_id)
+      end
+    end
+    captured
+  end
+
+  test "review agent passes the normalized mcp_servers array to RobotLab.build" do
+    run = review_run
+    specs = [{ name: "playwright", transport: { type: "stdio", command: "npx", args: ["-y", "@playwright/mcp@latest"] } }]
+
+    assert_equal specs, captured_mcp_servers(run.id, normalizer: ->(*) { specs })
+  end
+
+  test "review agent passes [] when there is no MCP config" do
+    run = review_run
+    assert_equal [], captured_mcp_servers(run.id, normalizer: ->(*) { [] })
+  end
+
+  test "review agent degrades to [] (and still completes) when the MCP config is invalid" do
+    run = review_run
+    captured = captured_mcp_servers(run.id, normalizer: ->(*) { raise McpConfigNormalizer::Error, "bad config" })
+
+    assert_equal [], captured
+    assert run.reload.completed?, "an invalid MCP config must not fail the run"
+  end
+
+  test "non-review agents get [] mcp_servers and never read the MCP config" do
+    # @agent_run is an implementation run; the normalizer must not be invoked.
+    captured = captured_mcp_servers(@agent_run.id, normalizer: ->(*) { raise "should not be called for a non-review agent" })
+
+    assert_equal [], captured
   end
 end

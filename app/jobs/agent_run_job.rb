@@ -33,6 +33,9 @@ class AgentRunJob < ApplicationJob
     agent_run.update!(status: "failed")
     Rails.logger.error("AgentRunJob##{agent_run.id} (#{agent_run.agent_type}) failed: #{e.class}: #{e.message}")
   ensure
+    # RobotLab connects the MCP clients when the robot is built; tear down their
+    # stdio subprocesses when the turn ends.
+    robot.disconnect if robot.respond_to?(:disconnect)
     recorder.finish
   end
 
@@ -44,6 +47,7 @@ class AgentRunJob < ApplicationJob
       provider: conversation.provider,
       model: conversation.model,
       local_tools: tools_for(agent_run, task),
+      mcp_servers: mcp_servers_for(agent_run), # RobotLab connects them + injects their tools
       on_content: ->(chunk) { recorder.record_content(chunk) },
       on_tool_call: ->(tool_call) { recorder.record_tool_call(tool_call) },
       on_tool_result: ->(result) { recorder.record_tool_result(result) }
@@ -94,5 +98,17 @@ class AgentRunJob < ApplicationJob
   def audit_tools(cwd)
     [ReadFileTool.new(cwd:), GlobTool.new(cwd:), GrepTool.new(cwd:),
      ListGithubIssuesTool.new(cwd:), CreateGithubIssueTool.new(cwd:)]
+  end
+
+  # MCP servers for this run. Review is the verification stage, so it's the one
+  # that gets browser/MCP access; other stages get none. RobotLab owns the
+  # connection lifecycle (Robot::MCPManagement) -- we just hand it the spec array.
+  def mcp_servers_for(agent_run)
+    return [] unless agent_run.agent_type == "review"
+
+    McpConfigNormalizer.call
+  rescue McpConfigNormalizer::Error => e
+    Rails.logger.warn("MCP config invalid, review agent running without MCP tools: #{e.message}")
+    []
   end
 end
