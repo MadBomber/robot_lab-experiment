@@ -22,18 +22,6 @@ class AgentRunJob < ApplicationJob
   private
 
   def run_turn(agent_run, task, conversation, recorder)
-    # Load MCP config if review agent (for browser verification etc.)
-    @mcp_config = nil
-    if should_load_mcp?(agent_run)
-      normalized = McpConfigNormalizer.load_and_normalize(
-        Rails.root.join("config", "mcp_servers.json")
-      )
-      @mcp_config = normalized unless normalized.empty?
-    end
-
-    # Establish MCP connections before reading tools.
-    RubyLLM::MCP.establish_connection(@mcp_config) if @mcp_config&.any?
-
     recorder.start
     robot = build_robot(agent_run, task, conversation, recorder)
     # Robot#run has its own `tools: :none` default, independent of local_tools
@@ -45,7 +33,9 @@ class AgentRunJob < ApplicationJob
     agent_run.update!(status: "failed")
     Rails.logger.error("AgentRunJob##{agent_run.id} (#{agent_run.agent_type}) failed: #{e.class}: #{e.message}")
   ensure
-    RubyLLM::MCP.close_connection rescue nil if @mcp_config
+    # RobotLab connects the MCP clients when the robot is built; tear down their
+    # stdio subprocesses when the turn ends.
+    robot.disconnect if robot.respond_to?(:disconnect)
     recorder.finish
   end
 
@@ -57,6 +47,7 @@ class AgentRunJob < ApplicationJob
       provider: conversation.provider,
       model: conversation.model,
       local_tools: tools_for(agent_run, task),
+      mcp_servers: mcp_servers_for(agent_run), # RobotLab connects them + injects their tools
       on_content: ->(chunk) { recorder.record_content(chunk) },
       on_tool_call: ->(tool_call) { recorder.record_tool_call(tool_call) },
       on_tool_result: ->(result) { recorder.record_tool_result(result) }
@@ -76,7 +67,7 @@ class AgentRunJob < ApplicationJob
     case agent_run.agent_type
     when "planning" then doc_tools + planning_tools(cwd, task)
     when "implementation" then doc_tools + implementation_tools(cwd)
-    when "review" then doc_tools + review_tools(cwd, task) + mcp_tools_for(agent_run)
+    when "review" then doc_tools + review_tools(cwd, task)
     when "pr" then doc_tools + pr_tools(cwd, task)
     when "audit" then doc_tools + audit_tools(cwd)
     end
@@ -109,42 +100,15 @@ class AgentRunJob < ApplicationJob
      ListGithubIssuesTool.new(cwd:), CreateGithubIssueTool.new(cwd:)]
   end
 
-  # Returns MCP tools for the review agent when a config exists.
-  def mcp_tools_for(agent_run)
-    return [] unless should_load_mcp?(agent_run)
+  # MCP servers for this run. Review is the verification stage, so it's the one
+  # that gets browser/MCP access; other stages get none. RobotLab owns the
+  # connection lifecycle (Robot::MCPManagement) -- we just hand it the spec array.
+  def mcp_servers_for(agent_run)
+    return [] unless agent_run.agent_type == "review"
 
-    @_mcp_tools ||= begin
-      normalized = McpConfigNormalizer.load_and_normalize(
-        Rails.root.join("config", "mcp_servers.json")
-      )
-      if normalized.any?
-        mcp_tools
-      else
-        []
-      end
-    rescue StandardError => e
-      Rails.logger.warn("MCP tool load failed: #{e.class}: #{e.message}")
-      []
-    end
-  end
-
-  # Invokes RubyLLM::MCP.tools and returns the list. Called after establish_connection() so
-  # the MCP servers have been configured and their tools are available.
-  def mcp_tools
-    @_mcp_tools_list ||= begin
-      RubyLLM::MCP.tools
-    rescue StandardError => e
-      Rails.logger.warn("RubyLLM::MCP.tools failed: #{e.class}: #{e.message}")
-      []
-    end
-  end
-
-  # Decide whether this agent run should load MCP tools.
-  def should_load_mcp?(agent_run)
-    agent_run.agent_type == "review" && mcp_config_path.exist?
-  end
-
-  def mcp_config_path
-    @_mcp_config_path ||= Rails.root.join("config", "mcp_servers.json")
+    McpConfigNormalizer.call
+  rescue McpConfigNormalizer::Error => e
+    Rails.logger.warn("MCP config invalid, review agent running without MCP tools: #{e.message}")
+    []
   end
 end

@@ -9,168 +9,124 @@ class McpConfigNormalizerTest < ActiveSupport::TestCase
     FileUtils.rm_rf(@tmpdir)
   end
 
-  # ---- config file does not exist ----
-
-  test "returns empty hash when config file does not exist" do
-    nonexistent_path = File.join(@tmpdir, "does_not_exist.json")
-    refute File.exist?(nonexistent_path)
-
-    result = McpConfigNormalizer.load_and_normalize(nonexistent_path)
-    assert_equal({}, result)
+  def write(name, body)
+    path = File.join(@tmpdir, name)
+    File.write(path, body)
+    path
   end
 
-  # ---- JSON config (Claude Desktop format) ----
+  # ---- absent / empty ----
 
-  test "converts mcpServers key to normalised shape with stdio transport" do
-    path = File.join(@tmpdir, "mcp_servers.json")
-    File.write(path, <<~JSON)
-      {
-        "mcpServers": {
-          "playwright": {
-            "command": "npx",
-            "args": ["-y", "@playwright/mcp@latest"]
-          }
-        }
-      }
-    JSON
-
-    result = McpConfigNormalizer.load_and_normalize(path)
-
-    assert_equal({
-      command: "npx",
-      args: ["-y", "@playwright/mcp@latest"],
-      transport_type: "stdio"
-    }, result["playwright"])
+  test "returns [] when the config file does not exist" do
+    assert_equal [], McpConfigNormalizer.call(File.join(@tmpdir, "nope.json"))
   end
 
-  test "converts mcpServers key with url to streamable transport" do
-    path = File.join(@tmpdir, "mcp_servers.json")
-    File.write(path, <<~JSON)
-      {
-        "mcpServers": {
-          "http-server": {
-            "url": "https://example.com/mcp"
-          }
-        }
-      }
-    JSON
-
-    result = McpConfigNormalizer.load_and_normalize(path)
-
-    assert_equal({
-      url: "https://example.com/mcp",
-      transport_type: "streamable"
-    }, result["http-server"])
+  test "returns [] when mcpServers key is absent" do
+    path = write("mcp_servers.json", '{"other": {}}')
+    assert_equal [], McpConfigNormalizer.call(path)
   end
 
-  test "skips servers with null url (sse fallback)" do
-    path = File.join(@tmpdir, "mcp_servers.json")
-    File.write(path, <<~JSON)
-      {
-        "mcpServers": {
-          "sse-server": {
-            "url": null
-          }
-        }
-      }
+  # ---- stdio ----
+
+  test "stdio transport is inferred from a command" do
+    path = write("mcp_servers.json", <<~JSON)
+      { "mcpServers": { "playwright": { "command": "npx", "args": ["-y", "@playwright/mcp@latest"] } } }
     JSON
 
-    result = McpConfigNormalizer.load_and_normalize(path)
-
-    assert_empty result
+    assert_equal(
+      [{ name: "playwright", transport: { type: "stdio", command: "npx", args: ["-y", "@playwright/mcp@latest"] } }],
+      McpConfigNormalizer.call(path)
+    )
   end
 
-  test "handles multiple servers in one config" do
-    path = File.join(@tmpdir, "mcp_servers.json")
-    File.write(path, <<~JSON)
-      {
-        "mcpServers": {
-          "playwright": {
-            "command": "npx",
-            "args": ["-y", "@playwright/mcp@latest"]
-          },
-          "filesystem": {
-            "command": "npx",
-            "args": ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"]
-          }
-        }
-      }
+  test "stdio env is passed through" do
+    path = write("mcp_servers.json", '{"mcpServers":{"gh":{"command":"docker","args":["run"],"env":{"TOKEN":"x"}}}}')
+    spec = McpConfigNormalizer.call(path).first
+    assert_equal({ type: "stdio", command: "docker", args: ["run"], env: { "TOKEN" => "x" } }, spec[:transport])
+  end
+
+  # ---- url / explicit type ----
+
+  test "url with no type is treated as streamable-http" do
+    path = write("mcp_servers.json", '{"mcpServers":{"api":{"url":"https://example.com/mcp"}}}')
+    assert_equal(
+      [{ name: "api", transport: { type: "streamable-http", url: "https://example.com/mcp" } }],
+      McpConfigNormalizer.call(path)
+    )
+  end
+
+  test "explicit sse type is honored (not collapsed to http)" do
+    path = write("mcp_servers.json", '{"mcpServers":{"sentry":{"type":"sse","url":"https://mcp.sentry.dev/sse"}}}')
+    assert_equal "sse", McpConfigNormalizer.call(path).first.dig(:transport, :type)
+  end
+
+  test "explicit http type maps to streamable-http" do
+    path = write("mcp_servers.json", '{"mcpServers":{"api":{"type":"http","url":"https://x/mcp"}}}')
+    assert_equal "streamable-http", McpConfigNormalizer.call(path).first.dig(:transport, :type)
+  end
+
+  # ---- multiple ----
+
+  test "handles multiple servers with mixed transports" do
+    path = write("mcp_servers.json", <<~JSON)
+      { "mcpServers": {
+        "playwright": { "command": "npx", "args": ["x"] },
+        "remote":     { "type": "sse", "url": "https://s/sse" }
+      } }
     JSON
 
-    result = McpConfigNormalizer.load_and_normalize(path)
-
+    result = McpConfigNormalizer.call(path)
     assert_equal 2, result.size
-    assert_equal "stdio", result.dig("playwright", :transport_type)
-    assert_equal "stdio", result.dig("filesystem", :transport_type)
+    assert_equal "stdio", result.find { |s| s[:name] == "playwright" }.dig(:transport, :type)
+    assert_equal "sse", result.find { |s| s[:name] == "remote" }.dig(:transport, :type)
   end
 
-  test "handles top-level mcp.servers alternate format" do
-    path = File.join(@tmpdir, "mcp_servers.json")
-    File.write(path, <<~JSON)
-      {
-        "mcp": {
-          "servers": {
-            "alt-server": {
-              "command": "node",
-              "args": ["server.js"]
-            }
-          }
-        }
-      }
-    JSON
+  # ---- loud failures on malformed config ----
 
-    result = McpConfigNormalizer.load_and_normalize(path)
-
-    assert_equal({
-      command: "node",
-      args: ["server.js"],
-      transport_type: "stdio"
-    }, result["alt-server"])
+  test "raises when mcpServers is an array instead of an object" do
+    path = write("mcp_servers.json", '{"mcpServers":[{"command":"npx"}]}')
+    error = assert_raises(McpConfigNormalizer::Error) { McpConfigNormalizer.call(path) }
+    assert_match "must be an object", error.message
   end
 
-  test "skips entries that are not hashes" do
-    path = File.join(@tmpdir, "mcp_servers.json")
-    File.write(path, <<~JSON)
-      {
-        "mcpServers": {
-          "valid": {
-            "command": "echo",
-            "args": ["hello"]
-          },
-          "invalid_value": "just a string"
-        }
-      }
-    JSON
-
-    result = McpConfigNormalizer.load_and_normalize(path)
-
-    assert_equal({
-      command: "echo",
-      args: ["hello"],
-      transport_type: "stdio"
-    }, result["valid"])
+  test "raises when a stdio server has no command" do
+    path = write("mcp_servers.json", '{"mcpServers":{"bad":{"type":"stdio","args":["x"]}}}')
+    error = assert_raises(McpConfigNormalizer::Error) { McpConfigNormalizer.call(path) }
+    assert_match "requires a command", error.message
   end
 
-  # ---- ERB interpolation ----
+  test "raises on an unsupported transport type" do
+    path = write("mcp_servers.json", '{"mcpServers":{"weird":{"type":"carrier-pigeon","url":"x"}}}')
+    error = assert_raises(McpConfigNormalizer::Error) { McpConfigNormalizer.call(path) }
+    assert_match "unsupported transport type", error.message
+  end
 
-  test "ERB interpolation works when server values are env-templated" do
-    path = File.join(@tmpdir, "mcp_servers.erb")
-    erb_content = <<~'ERB'
-      {
-        "mcpServers": {
-          "secretd": {
-            "command": "<%= ENV.fetch("MCP_CMD", "npx") %>",
-            "args": ["-y", "@playwright/mcp@latest"]
-          }
-        }
-      }
+  test "raises on invalid JSON" do
+    path = write("mcp_servers.json", "{ not json")
+    assert_raises(McpConfigNormalizer::Error) { McpConfigNormalizer.call(path) }
+  end
+
+  # ---- ERB + path resolution ----
+
+  test "ERB interpolates env vars in the config" do
+    path = write("mcp_servers.erb", <<~ERB)
+      { "mcpServers": { "s": { "command": "<%= ENV.fetch("MCP_CMD", "npx") %>", "args": [] } } }
     ERB
-    File.write(path, erb_content)
-
-    ENV["MCP_CMD"] = "custom-command"
-    result = McpConfigNormalizer.load_and_normalize(path)
-    assert_equal({ command: "custom-command", args: ["-y", "@playwright/mcp@latest"], transport_type: "stdio" }, result["secretd"])
+    ENV["MCP_CMD"] = "custom"
+    assert_equal "custom", McpConfigNormalizer.call(path).first.dig(:transport, :command)
   ensure
     ENV.delete("MCP_CMD")
+  end
+
+  test "default_path honors MCP_CONFIG_PATH and expands a tilde" do
+    ENV["MCP_CONFIG_PATH"] = "~/.mcp.json"
+    assert_equal File.expand_path("~/.mcp.json"), File.expand_path(McpConfigNormalizer.default_path)
+  ensure
+    ENV.delete("MCP_CONFIG_PATH")
+  end
+
+  test "default_path falls back to config/mcp_servers.json" do
+    ENV.delete("MCP_CONFIG_PATH")
+    assert_equal Rails.root.join("config/mcp_servers.json").to_s, McpConfigNormalizer.default_path
   end
 end
