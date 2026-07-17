@@ -20,6 +20,11 @@
     <%= link_to "New task", new_project_task_path(@project), class: "inline-block bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded" %>
     <%= button_to "Run self-audit", project_audit_tasks_path(@project),
           class: "inline-block bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded ml-2", form_class: "inline" %>
+    <% if @tasks.any?(&:completed?) %>
+      <%= button_to "Clear completed tasks", clear_completed_project_tasks_path(@project), method: :delete,
+            data: { turbo_confirm: "This will permanently delete all completed tasks, their worktrees, and archived docs.\n\nAre you sure?" },
+            class: "inline-block bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded ml-2", form_class: "inline" %>
+    <% end %>
   </div>
 
   <h2 class="text-lg font-semibold mb-2 mt-6">Open GitHub Issues</h2>

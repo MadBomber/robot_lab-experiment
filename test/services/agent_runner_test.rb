@@ -35,6 +35,12 @@ class AgentRunnerTest < ActiveSupport::TestCase
     assert @task.reload.in_progress?
   end
 
+  test "flips an in_review task back to in_progress when implementation is kicked off" do
+    @task.update!(planning_complete: true, status: "in_review")
+    AgentRunner.start_agent_run(@task, :implementation)
+    assert @task.reload.in_progress?
+  end
+
   test "raises AlreadyRunningError when a run is already in flight for the task" do
     AgentRunner.start_agent_run(@task, :planning)
 

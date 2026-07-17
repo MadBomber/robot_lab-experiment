@@ -109,4 +109,67 @@ class TaskTest < ActiveSupport::TestCase
     AgentRun.create!(task:, conversation:, agent_type: "audit", status: "completed")
     assert_equal [], task.runnable_agent_types
   end
+
+  test "derived_status is pending until a run exists" do
+    task = Task.create!(project: @project, title: "Do the thing")
+    assert_equal "pending", task.derived_status
+  end
+
+  test "derived_status is in_progress once a run exists but planning isn't complete" do
+    task = Task.create!(project: @project, title: "Do the thing")
+    make_run(task, "planning", status: "running")
+    assert_equal "in_progress", task.derived_status
+  end
+
+  test "derived_status is in_review after planning completes and before implementation starts" do
+    task = Task.create!(project: @project, title: "Do the thing", planning_complete: true)
+    make_run(task, "planning", status: "completed")
+    assert_equal "in_review", task.derived_status
+  end
+
+  test "derived_status returns to in_progress once implementation has started" do
+    task = Task.create!(project: @project, title: "Do the thing", planning_complete: true)
+    make_run(task, "planning", status: "completed")
+    make_run(task, "implementation", status: "running")
+    assert_equal "in_progress", task.derived_status
+  end
+
+  test "derived_status is completed once the pr agent completes (fix task)" do
+    task = Task.create!(project: @project, title: "Do the thing",
+                        planning_complete: true, workflow_complete: true, pr_agent_complete: true)
+    make_run(task, "pr", status: "completed")
+    assert_equal "completed", task.derived_status
+  end
+
+  test "derived_status is completed once the audit run completes (audit task)" do
+    task = Task.create!(project: @project, title: "Self-audit", task_kind: "audit")
+    make_run(task, "audit", status: "completed")
+    assert_equal "completed", task.derived_status
+  end
+
+  test "derived_status is not completed for a failed audit run" do
+    task = Task.create!(project: @project, title: "Self-audit", task_kind: "audit")
+    make_run(task, "audit", status: "failed")
+    assert_equal "in_progress", task.derived_status
+  end
+
+  test "recompute_status! persists derived_status, and is a no-op when already correct" do
+    task = Task.create!(project: @project, title: "Do the thing")
+    make_run(task, "planning", status: "completed")
+    task.update!(planning_complete: true)
+
+    task.recompute_status!
+    assert_equal "in_review", task.reload.status
+
+    assert_no_changes -> { task.updated_at } do
+      task.recompute_status!
+    end
+  end
+
+  private
+
+  def make_run(task, agent_type, status:)
+    conversation = Conversation.create!(task:, provider: "ollama", model: "qwen3.6:latest", started_at: Time.current)
+    AgentRun.create!(task:, conversation:, agent_type:, status:)
+  end
 end

@@ -70,6 +70,50 @@ class TasksControllerTest < ActionDispatch::IntegrationTest
     assert_not task.reload.blocked?
   end
 
+  test "update_status manually overrides the task's status" do
+    task = Task.create!(project: @project, title: "Add login")
+    patch update_status_project_task_url(@project, task), params: { status: "completed" }
+    assert_redirected_to project_task_url(@project, task)
+    assert task.reload.completed?
+  end
+
+  test "update_status rejects an unknown status value" do
+    task = Task.create!(project: @project, title: "Add login")
+    patch update_status_project_task_url(@project, task), params: { status: "vibes" }
+    assert_redirected_to project_task_url(@project, task)
+    assert task.reload.pending?
+  end
+
+  test "clear_completed deletes only completed tasks, including their worktrees and archives" do
+    archive_root = Dir.mktmpdir("archive_root")
+    previous_env = ENV.fetch("ROBOT_LAB_EXPERIMENT_ARCHIVE_ROOT", nil)
+    ENV["ROBOT_LAB_EXPERIMENT_ARCHIVE_ROOT"] = archive_root
+
+    post project_tasks_url(@project), params: { task: { title: "Done task", description: "d" } }
+    done_task = @project.tasks.find_by!(title: "Done task")
+    post project_tasks_url(@project), params: { task: { title: "Still going", description: "d" } }
+    active_task = @project.tasks.find_by!(title: "Still going")
+    patch update_status_project_task_url(@project, done_task), params: { status: "completed" }
+
+    delete clear_completed_project_tasks_url(@project)
+
+    assert_redirected_to project_url(@project)
+    refute Task.exists?(done_task.id)
+    refute Dir.exist?(done_task.worktree_path)
+    assert Task.exists?(active_task.id)
+    assert Dir.exist?(active_task.worktree_path)
+  ensure
+    ENV["ROBOT_LAB_EXPERIMENT_ARCHIVE_ROOT"] = previous_env
+    FileUtils.rm_rf(archive_root) if defined?(archive_root)
+  end
+
+  test "clear_completed is a no-op when nothing is completed" do
+    task = Task.create!(project: @project, title: "Still going")
+    delete clear_completed_project_tasks_url(@project)
+    assert_redirected_to project_url(@project)
+    assert Task.exists?(task.id)
+  end
+
   test "destroy removes worktree and archive" do
     archive_root = Dir.mktmpdir("archive_root")
     previous_env = ENV.fetch("ROBOT_LAB_EXPERIMENT_ARCHIVE_ROOT", nil)

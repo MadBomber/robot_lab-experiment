@@ -51,9 +51,32 @@ class Task < ApplicationRecord
     update!(blocked_reason: nil)
   end
 
+  # The status enum is display-only state derived from the same flags
+  # runnable_agent_types uses -- it never drives branching logic itself, so
+  # it's safe to recompute freely without touching the real state machine.
+  def derived_status
+    return "pending" unless agent_runs.exists?
+    return "completed" if pipeline_complete?
+    return "in_review" if awaiting_implementation_kickoff?
+
+    "in_progress"
+  end
+
+  def recompute_status!
+    update!(status: derived_status) unless status == derived_status
+  end
+
   private
 
   def audit_runnable_types
     agent_runs.audit.exists? ? [] : ["audit"]
+  end
+
+  def pipeline_complete?
+    audit? ? agent_runs.audit.completed.exists? : pr_agent_complete?
+  end
+
+  def awaiting_implementation_kickoff?
+    planning_complete? && !agent_runs.implementation.exists?
   end
 end
