@@ -2,11 +2,11 @@ require:
   - rubocop-rails
   - rubocop-rake
   - rubocop-minitest
-  - rubocop-performance
 
 AllCops:
   TargetRubyVersion: ~3.2
   NewCops: enable
+  SuggestExtensions: false
 
 Style/StringLiterals:
   EnforcedStyle: single_quotes
