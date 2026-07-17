@@ -16,7 +16,7 @@
       <% end %>
     </p>
 
-    <%= render "tasks/agent_status", running: task.running_agent_run.present? %>
+    <%= render "tasks/agent_status", running: task.running_agent_run.present?, task: %>
 
     <div class="mb-6 space-x-2">
       <% task.runnable_agent_types.each do |agent_type| %>
