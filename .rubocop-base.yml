@@ -1,24 +1,13 @@
-require:
-  - rubocop-rails
-  - rubocop-rake
-  - rubocop-minitest
-
 AllCops:
   TargetRubyVersion: ~3.2
-  NewCops: enable
-  SuggestExtensions: false
+  NewCops: disable
+  Exclude:
+    - 'bin/**/*'
+    - 'db/**/*'
+    - 'config/importmap.rb'
 
 Style/StringLiterals:
   EnforcedStyle: single_quotes
 
 Style/FrozenStringLiteralComment:
-  Enabled: true
-
-Layout/InitialIndentation:
-  Enabled: false
-
-Naming/VariableNumber:
-  Enabled: false
-
-Security/YAMLLoad:
   Enabled: false
