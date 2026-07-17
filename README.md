@@ -49,3 +49,4 @@ bin/ci            # full local CI: setup, rubocop, audits, brakeman, tests
 See [`CLAUDE.md`](CLAUDE.md) for the architecture: the `AgentRunner` /
 `AgentRunCompletionHandler` state machine, the per-stage tool sets, and the
 task-doc contract agents pass work through.
+
