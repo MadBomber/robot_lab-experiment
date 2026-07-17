@@ -33,6 +33,9 @@
 # Ignore master key for decrypting credentials and more.
 /config/master.key
 
+# MCP server config (contains secrets/tokens via ERB env interpolation).
+/config/mcp_servers.json
+
 .byebug_history
 
 # Quality-gate scratch output (asgard quality) -- .quality/reek_baseline.txt

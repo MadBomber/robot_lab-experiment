@@ -22,6 +22,18 @@ class AgentRunJob < ApplicationJob
   private
 
   def run_turn(agent_run, task, conversation, recorder)
+    # Load MCP config if review agent (for browser verification etc.)
+    @mcp_config = nil
+    if should_load_mcp?(agent_run)
+      normalized = McpConfigNormalizer.load_and_normalize(
+        Rails.root.join("config", "mcp_servers.json")
+      )
+      @mcp_config = normalized unless normalized.empty?
+    end
+
+    # Establish MCP connections before reading tools.
+    RubyLLM::MCP.establish_connection(@mcp_config) if @mcp_config&.any?
+
     recorder.start
     robot = build_robot(agent_run, task, conversation, recorder)
     # Robot#run has its own `tools: :none` default, independent of local_tools
@@ -33,6 +45,7 @@ class AgentRunJob < ApplicationJob
     agent_run.update!(status: "failed")
     Rails.logger.error("AgentRunJob##{agent_run.id} (#{agent_run.agent_type}) failed: #{e.class}: #{e.message}")
   ensure
+    RubyLLM::MCP.close_connection rescue nil if @mcp_config
     recorder.finish
   end
 
@@ -63,7 +76,7 @@ class AgentRunJob < ApplicationJob
     case agent_run.agent_type
     when "planning" then doc_tools + planning_tools(cwd, task)
     when "implementation" then doc_tools + implementation_tools(cwd)
-    when "review" then doc_tools + review_tools(cwd, task)
+    when "review" then doc_tools + review_tools(cwd, task) + mcp_tools_for(agent_run)
     when "pr" then doc_tools + pr_tools(cwd, task)
     when "audit" then doc_tools + audit_tools(cwd)
     end
@@ -94,5 +107,44 @@ class AgentRunJob < ApplicationJob
   def audit_tools(cwd)
     [ReadFileTool.new(cwd:), GlobTool.new(cwd:), GrepTool.new(cwd:),
      ListGithubIssuesTool.new(cwd:), CreateGithubIssueTool.new(cwd:)]
+  end
+
+  # Returns MCP tools for the review agent when a config exists.
+  def mcp_tools_for(agent_run)
+    return [] unless should_load_mcp?(agent_run)
+
+    @_mcp_tools ||= begin
+      normalized = McpConfigNormalizer.load_and_normalize(
+        Rails.root.join("config", "mcp_servers.json")
+      )
+      if normalized.any?
+        mcp_tools
+      else
+        []
+      end
+    rescue StandardError => e
+      Rails.logger.warn("MCP tool load failed: #{e.class}: #{e.message}")
+      []
+    end
+  end
+
+  # Invokes RubyLLM::MCP.tools and returns the list. Called after establish_connection() so
+  # the MCP servers have been configured and their tools are available.
+  def mcp_tools
+    @_mcp_tools_list ||= begin
+      RubyLLM::MCP.tools
+    rescue StandardError => e
+      Rails.logger.warn("RubyLLM::MCP.tools failed: #{e.class}: #{e.message}")
+      []
+    end
+  end
+
+  # Decide whether this agent run should load MCP tools.
+  def should_load_mcp?(agent_run)
+    agent_run.agent_type == "review" && mcp_config_path.exist?
+  end
+
+  def mcp_config_path
+    @_mcp_config_path ||= Rails.root.join("config", "mcp_servers.json")
   end
 end

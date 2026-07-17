@@ -1,4 +1,5 @@
 require "test_helper"
+require "ruby_llm/mcp"
 
 class AgentRunJobTest < ActiveSupport::TestCase
   FakeChunk = Struct.new(:content, :thinking)
@@ -117,5 +118,137 @@ class AgentRunJobTest < ActiveSupport::TestCase
     assert(captured.any?(ListGithubIssuesTool))
     assert(captured.any?(CreateGithubIssueTool))
     assert_empty captured.grep(TaskCompletionTool)
+  end
+
+  # ---- MCP integration tests (stubbed) ----
+  # Each test creates its own temp directory via Dir.mktmpdir (guaranteed unique per call).
+  # Rails.root is overridden so AgentRunJob's mcp_config_path always points inside that
+  # test's own temp directory — this keeps all parallel-process interactions out of each
+  # other's files, fixing the original race-condition failures.
+
+  def override_rails_root(dir)
+    Rails.stub(:root, Pathname.new(dir)) { yield }
+  end
+
+  # Write an MCP config file under tmpdir/config/mcp_servers.json (matching what
+  # AgentRunJob#mcp_config_path expects when Rails.root is overridden).
+  def write_mcp_config(tmpdir)
+    cpath = File.join(tmpdir, "config", "mcp_servers.json")
+    FileUtils.mkdir_p(File.dirname(cpath))
+    File.write(cpath, <<~JSON)
+      {
+        "mcpServers": {
+          "playwright": {
+            "command": "npx",
+            "args": ["-y", "@playwright/mcp@latest"]
+          }
+        }
+      }
+    JSON
+    cpath
+  end
+
+  test "review agent gets MCP tools when config exists" do
+    review_run = AgentRun.create!(
+      task: @task,
+      conversation: Conversation.create!(
+        task: @task, provider: "ollama", model: "qwen3.6:latest", started_at: Time.current
+      ),
+      agent_type: "review",
+      status: "running"
+    )
+
+    # Create per-test unique temp directory and write a standard MCP config into it.
+    tmpdir = Dir.mktmpdir("mcp_test_config")
+    cp = write_mcp_config(tmpdir)
+
+    fake_mcp_tool = Struct.new(:name).new("playwright_launch_browser")
+
+    begin
+      captured = nil
+      McpConfigNormalizer.stub(:load_and_normalize, lambda { |_path|
+        { "playwright" => { transport_type: "stdio", command: "npx", args: ["-y", "@playwright/mcp@latest"] } }
+      }) do
+        RubyLLM::MCP.stub(:establish_connection, ->(_config) { true }) do
+          RubyLLM::MCP.stub(:tools, -> { [fake_mcp_tool] }) do
+            override_rails_root(tmpdir) do
+              RobotLab.stub(:build, lambda { |**kwargs|
+                captured = kwargs[:local_tools]
+                FakeRobot.new(**kwargs)
+              }) do
+                AgentRunJob.perform_now(review_run.id)
+              end
+            end
+          end
+        end
+      end
+
+      assert(captured.any?(MarkWorkflowCompleteTool))
+      assert captured.include?(fake_mcp_tool), "Expected MCP tool #{fake_mcp_tool.inspect} in tools list - got: #{captured.to_a.map(&:class).map(&:name)}"
+    ensure
+      File.delete(cp) if File.exist?(cp)
+      FileUtils.rm_rf(tmpdir) if File.exist?(tmpdir)
+    end
+  end
+
+  test "review agent does not get MCP tools when config file is missing" do
+    review_run = AgentRun.create!(
+      task: @task,
+      conversation: Conversation.create!(
+        task: @task, provider: "ollama", model: "qwen3.6:latest", started_at: Time.current
+      ),
+      agent_type: "review",
+      status: "running"
+    )
+
+    # Temp dir without an MCP config — AgentRunJob#should_load_mcp? returns false.
+    tmpdir = Dir.mktmpdir("mcp_test_config")
+
+    begin
+      captured = nil
+      override_rails_root(tmpdir) do
+        RobotLab.stub(:build, lambda { |**kwargs|
+          captured = kwargs[:local_tools]
+          FakeRobot.new(**kwargs)
+        }) do
+          AgentRunJob.perform_now(review_run.id)
+        end
+      end
+
+      assert(captured.any?(MarkWorkflowCompleteTool))
+    ensure
+      FileUtils.rm_rf(tmpdir) if File.exist?(tmpdir)
+    end
+  end
+
+  test "non-review agents never get MCP tools (config present or not)" do
+    implementation_run = AgentRun.create!(
+      task: @task,
+      conversation: Conversation.create!(
+        task: @task, provider: "ollama", model: "qwen3.6:latest", started_at: Time.current
+      ),
+      agent_type: "implementation",
+      status: "running"
+    )
+
+    # Temp dir without any config — isolates from stale parallel-process files.
+    tmpdir = Dir.mktmpdir("mcp_test_config")
+
+    begin
+      captured = nil
+      override_rails_root(tmpdir) do
+        RobotLab.stub(:build, lambda { |**kwargs|
+          captured = kwargs[:local_tools]
+          FakeRobot.new(**kwargs)
+        }) do
+          AgentRunJob.perform_now(implementation_run.id)
+        end
+      end
+
+      assert(captured.any?(BashTool))
+      assert(captured.any?(ReadFileTool))
+    ensure
+      FileUtils.rm_rf(tmpdir) if File.exist?(tmpdir)
+    end
   end
 end
