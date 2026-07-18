@@ -51,4 +51,30 @@ class WorktreeServiceTest < ActiveSupport::TestCase
     branches, _status = Open3.capture2("git", "branch", chdir: @repo_dir)
     assert_no_match(/#{Regexp.escape(@task.branch_name)}/, branches)
   end
+
+  test "remove raises when the worktree removal fails and the directory remains" do
+    service = WorktreeService.new(@task)
+    path = service.create
+
+    # Simulate git failing while the worktree dir is still present on disk.
+    failure = ["", "fatal: could not remove", Struct.new(:success?).new(false)]
+    Open3.stub(:capture3, ->(*_args, **_kwargs) { failure }) do
+      assert_raises(WorktreeService::Error) { service.remove }
+    end
+
+    assert Dir.exist?(path), "the still-present worktree should not be reported as removed"
+  end
+
+  test "remove tolerates git errors when the worktree directory is already gone" do
+    service = WorktreeService.new(@task)
+    path = service.create
+    FileUtils.rm_rf(path)
+
+    # git errors because the worktree is missing, but there's nothing left to
+    # clean up, so remove must treat it as a benign no-op rather than raise.
+    failure = ["", "fatal: is not a working tree", Struct.new(:success?).new(false)]
+    Open3.stub(:capture3, ->(*_args, **_kwargs) { failure }) do
+      assert_nothing_raised { service.remove }
+    end
+  end
 end

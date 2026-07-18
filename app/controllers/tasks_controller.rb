@@ -36,8 +36,14 @@ class TasksController < ApplicationController
 
   def clear_completed
     tasks = @project.tasks.completed.to_a
-    tasks.each { |task| delete_task!(task) }
-    redirect_to @project, notice: "Cleared #{tasks.size} completed #{'task'.pluralize(tasks.size)}."
+    # One task that fails to tear down (e.g. a stuck worktree, now that
+    # WorktreeService#remove surfaces those) must not abort the whole sweep.
+    failed = tasks.reject { |task| destroy_task(task) }
+    cleared = tasks.size - failed.size
+
+    notice = "Cleared #{cleared} completed #{'task'.pluralize(cleared)}."
+    notice += " #{failed.size} could not be deleted." if failed.any?
+    redirect_to @project, notice:
   end
 
   def unblock
@@ -87,6 +93,16 @@ class TasksController < ApplicationController
     WorktreeService.new(task).remove
     TaskDocument.delete_archive(task)
     task.destroy!
+  end
+
+  # Best-effort variant for bulk teardown: returns whether the task was deleted,
+  # logging (not raising) so one stuck task doesn't abort a clear_completed sweep.
+  def destroy_task(task)
+    delete_task!(task)
+    true
+  rescue => e
+    Rails.logger.error("clear_completed: could not delete task #{task.id}: #{e.message}")
+    false
   end
 
   def prefill_from_issue(number)

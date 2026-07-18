@@ -142,6 +142,20 @@ class TasksControllerTest < ActionDispatch::IntegrationTest
     assert Task.exists?(task.id)
   end
 
+  test "clear_completed survives a task that fails to tear down and reports it" do
+    two = Array.new(2) { |i| Task.create!(project: @project, title: "Done #{i}", status: "completed") }
+
+    # Force teardown to blow up for every task; the sweep must not 500 -- it
+    # redirects, leaves the tasks in place, and reports the failures.
+    TaskDocument.stub(:delete_archive, ->(*) { raise "stuck worktree" }) do
+      delete clear_completed_project_tasks_url(@project)
+    end
+
+    assert_redirected_to project_url(@project)
+    assert_equal(2, two.count { |t| Task.exists?(t.id) })
+    assert_match "2 could not be deleted", flash[:notice]
+  end
+
   test "destroy removes worktree and archive" do
     archive_root = Dir.mktmpdir("archive_root")
     previous_env = ENV.fetch("ROBOT_LAB_EXPERIMENT_ARCHIVE_ROOT", nil)
