@@ -78,7 +78,7 @@ class CodingToolTest < ActiveSupport::TestCase
       coder = CodingTool.new(cwd: @dir, sandbox_level: "root")
       assert_includes coder.send(:readable_roots), File.expand_path(temp_dir)
     ensure
-      ENV["AGENT_READABLE_ROOT"] = original if original
+      original ? ENV["AGENT_READABLE_ROOT"] = original : ENV.delete("AGENT_READABLE_ROOT")
       FileUtils.remove_entry(temp_dir) if temp_dir && Dir.exist?(temp_dir) rescue nil
       CodingTool.instance_variable_set(:@_coding_tool_readable_roots, nil)
     end
@@ -153,7 +153,7 @@ class CodingToolTest < ActiveSupport::TestCase
       ENV["AGENT_SANDBOX_LEVEL"] = "ROOT"
       assert_equal "root", CodingTool.effective_sandbox_level
     ensure
-      ENV["AGENT_SANDBOX_LEVEL"] = original if original
+      original ? ENV["AGENT_SANDBOX_LEVEL"] = original : ENV.delete("AGENT_SANDBOX_LEVEL")
     end
   end
 
@@ -163,7 +163,7 @@ class CodingToolTest < ActiveSupport::TestCase
       ENV.delete("AGENT_SANDBOX_LEVEL")
       assert_equal "tight", CodingTool.effective_sandbox_level
     ensure
-      ENV["AGENT_SANDBOX_LEVEL"] = original if original
+      original ? ENV["AGENT_SANDBOX_LEVEL"] = original : ENV.delete("AGENT_SANDBOX_LEVEL")
     end
   end
 
@@ -184,7 +184,7 @@ class CodingToolTest < ActiveSupport::TestCase
       assert_equal "root", CodingTool.effective_sandbox_level(agent_type: :review)
       assert_equal "loose", CodingTool.effective_sandbox_level(agent_type: :planning)
     ensure
-      ENV["AGENT_SANDBOX_LEVEL"] = original if original
+      original ? ENV["AGENT_SANDBOX_LEVEL"] = original : ENV.delete("AGENT_SANDBOX_LEVEL")
     end
   end
 
@@ -239,7 +239,7 @@ class CodingToolTest < ActiveSupport::TestCase
       roots2 = coder2.send(:readable_roots)
       assert_same roots1, roots2, "readable_roots should return the same memoized array"
     ensure
-      ENV["AGENT_READABLE_ROOT"] = original if original
+      original ? ENV["AGENT_READABLE_ROOT"] = original : ENV.delete("AGENT_READABLE_ROOT")
       CodingTool.instance_variable_set(:@_coding_tool_readable_roots, nil)
     end
   end
