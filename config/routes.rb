@@ -16,6 +16,7 @@ Rails.application.routes.draw do
       post :pause, on: :member
       post :stop, on: :member
       post :abandon, on: :member
+      post :guide, on: :member
       patch :update_status, on: :member
       get :heartbeat, on: :member
       delete :clear_completed, on: :collection

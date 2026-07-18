@@ -1,6 +1,6 @@
 class TasksController < ApplicationController
   before_action :set_project
-  before_action :set_task, only: %i[show destroy unblock pause stop abandon update_status heartbeat]
+  before_action :set_task, only: %i[show destroy unblock pause stop abandon guide update_status heartbeat]
 
   def new
     @task = @project.tasks.new
@@ -69,6 +69,21 @@ class TasksController < ApplicationController
     request_cancel(@task.running_agent_run)
     @task.update!(blocked_reason: "abandoned")
     redirect_to [@project, @task], notice: "Task abandoned."
+  end
+
+  # Human-in-the-loop redirect (#23): queue guidance for the task's next run and
+  # log it to the task doc. Applied the next time an agent runs (auto-chained, or
+  # after a Resume) -- to redirect an in-flight run, Stop it first, then guide.
+  def guide
+    guidance = params[:guidance].to_s.strip
+    if guidance.blank?
+      redirect_to [@project, @task], alert: "Guidance can't be blank."
+      return
+    end
+
+    @task.update!(pending_guidance: guidance)
+    TaskDocument.append_guidance(@task, guidance)
+    redirect_to [@project, @task], notice: "Guidance saved -- it will steer the next run."
   end
 
   # Manual escape hatch: the normal status is derived automatically from

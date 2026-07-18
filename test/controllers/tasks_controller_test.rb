@@ -194,6 +194,30 @@ class TasksControllerTest < ActionDispatch::IntegrationTest
     assert_equal "human_requested", task.reload.blocked_reason
   end
 
+  test "guide queues guidance for the next run and logs it to the task doc" do
+    archive_root = Dir.mktmpdir("archive_root")
+    previous_env = ENV.fetch("ROBOT_LAB_EXPERIMENT_ARCHIVE_ROOT", nil)
+    ENV["ROBOT_LAB_EXPERIMENT_ARCHIVE_ROOT"] = archive_root
+    task = Task.create!(project: @project, title: "Going")
+
+    post guide_project_task_url(@project, task), params: { guidance: "use the Playwright MCP server" }
+
+    assert_redirected_to project_task_url(@project, task)
+    assert_equal "use the Playwright MCP server", task.reload.pending_guidance
+    assert_includes TaskDocument.read(task), "## Human Guidance"
+    assert_includes TaskDocument.read(task), "use the Playwright MCP server"
+  ensure
+    ENV["ROBOT_LAB_EXPERIMENT_ARCHIVE_ROOT"] = previous_env
+    FileUtils.rm_rf(archive_root)
+  end
+
+  test "guide rejects blank guidance" do
+    task = Task.create!(project: @project, title: "Going")
+    post guide_project_task_url(@project, task), params: { guidance: "   " }
+    assert_redirected_to project_task_url(@project, task)
+    assert_nil task.reload.pending_guidance
+  end
+
   test "destroy removes worktree and archive" do
     archive_root = Dir.mktmpdir("archive_root")
     previous_env = ENV.fetch("ROBOT_LAB_EXPERIMENT_ARCHIVE_ROOT", nil)

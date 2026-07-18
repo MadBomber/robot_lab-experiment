@@ -52,4 +52,24 @@ class TaskDocumentTest < ActiveSupport::TestCase
     FileUtils.rm_rf(@repo_dir)
     assert_equal "persisted plan", TaskDocument.read(@task)
   end
+
+  test "append_guidance adds a Human Guidance section" do
+    TaskDocument.write(@task, "## Overview\n\nDo the thing.")
+    TaskDocument.append_guidance(@task, "use the Playwright MCP server")
+
+    doc = TaskDocument.read(@task)
+    assert_includes doc, "## Overview"
+    assert_includes doc, "## Human Guidance"
+    assert_includes doc, "use the Playwright MCP server"
+  end
+
+  test "append_guidance appends under the existing Human Guidance section on repeat" do
+    TaskDocument.append_guidance(@task, "first note")
+    TaskDocument.append_guidance(@task, "second note")
+
+    doc = TaskDocument.read(@task)
+    assert_equal 1, doc.scan("## Human Guidance").size
+    assert_includes doc, "first note"
+    assert_includes doc, "second note"
+  end
 end

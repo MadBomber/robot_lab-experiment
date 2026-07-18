@@ -39,5 +39,21 @@
               class: "bg-gray-600 text-white px-4 py-2 rounded" %>
       <% end %>
     </div>
+
+    <% unless task.completed? %>
+      <details class="mb-6" <%= "open" if task.pending_guidance.present? %>>
+        <summary class="cursor-pointer text-sm text-blue-600">Give the agents guidance</summary>
+        <% if task.pending_guidance.present? %>
+          <p class="text-xs text-gray-500 mt-2">Queued for the next run:
+            <span class="italic"><%= task.pending_guidance %></span></p>
+        <% end %>
+        <%= form_with url: guide_project_task_path(project, task), method: :post, class: "mt-2" do |f| %>
+          <%= f.text_area :guidance, rows: 3, placeholder: "e.g. use the Playwright MCP server, not Selenium",
+                class: "w-full border rounded p-2 text-sm" %>
+          <%= f.submit "Send guidance", class: "mt-1 bg-blue-600 text-white px-3 py-1 rounded text-sm cursor-pointer" %>
+        <% end %>
+        <p class="text-xs text-gray-400 mt-1">Applied on the next run. To redirect an in-flight run, Stop it first.</p>
+      </details>
+    <% end %>
   </div>
 </div>

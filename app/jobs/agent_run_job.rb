@@ -32,7 +32,7 @@ class AgentRunJob < ApplicationJob
     # Robot#run has its own `tools: :none` default, independent of local_tools
     # passed to RobotLab.build -- without this, the chat's tool list gets
     # wiped to empty on every turn and the LLM never sees any of our tools.
-    robot.run("Begin.", tools: :inherit)
+    robot.run(kickoff_message(task), tools: :inherit)
     agent_run.update!(status: "completed")
   rescue Cancelled
     # A human hit Stop/Abandon; the task is already blocked by the controller.
@@ -53,6 +53,17 @@ class AgentRunJob < ApplicationJob
     # stdio subprocesses when the turn ends.
     robot.disconnect if robot.respond_to?(:disconnect)
     recorder.finish
+  end
+
+  # The opening message for the turn. Prepends any human redirect (#23) queued
+  # since the last run and consumes it, so guidance applies to exactly this run.
+  def kickoff_message(task)
+    guidance = task.pending_guidance
+    return "Begin." if guidance.blank?
+
+    task.update!(pending_guidance: nil)
+    "A human overseeing this task has provided the following guidance. " \
+      "Follow it, adjusting your plan as needed:\n\n#{guidance}\n\nBegin."
   end
 
   def build_robot(agent_run, task, conversation, recorder, monitor)
