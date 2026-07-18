@@ -36,11 +36,8 @@ class AgentRunCompletionHandler
     # Cross-run plateau: if the task's progress fingerprint hasn't moved for
     # several cycles, the impl<->review loop is oscillating without progress --
     # block now rather than grinding to the iteration cap.
-    @task.record_progress!(ProgressFingerprint.for(@task))
-    if @task.plateaued?
-      @task.update!(blocked_reason: "no_progress")
-      return no_chain_with_broadcast(:blocked_no_progress)
-    end
+    plateau = stop_if_plateaued
+    return plateau if plateau
 
     next_type = @agent_run.implementation? ? :review : :implementation
     start_with_broadcast(
@@ -50,6 +47,16 @@ class AgentRunCompletionHandler
   end
 
   private
+
+  # Records this cycle's progress and, if the task has plateaued, blocks it and
+  # returns the no-chain Result; otherwise returns nil so the caller continues.
+  def stop_if_plateaued
+    @task.record_progress!(ProgressFingerprint.for(@task))
+    return unless @task.plateaued?
+
+    @task.update!(blocked_reason: "no_progress")
+    no_chain_with_broadcast(:blocked_no_progress)
+  end
 
   def start(agent_type, action)
     run = AgentRunner.start_agent_run(@task, agent_type)

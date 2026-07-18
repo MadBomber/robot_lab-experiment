@@ -65,10 +65,10 @@ class PlateauMonitor
   # back -- calls may vary superficially but the world isn't changing.
   def record_tool_result(result)
     key = Digest::SHA256.hexdigest(result.to_s)
-    @result_counts[key] += 1
-    return if @result_counts[key] < @identical_result_limit
+    count = (@result_counts[key] += 1)
+    return if count < @identical_result_limit
 
-    raise Plateaued, "the same tool result recurred #{@result_counts[key]} times"
+    raise Plateaued, "the same tool result recurred #{count} times"
   end
 
   private

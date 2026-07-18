@@ -35,24 +35,40 @@ class AgentRunJob < ApplicationJob
     robot.run(kickoff_message(task), tools: :inherit)
     agent_run.update!(status: "completed")
   rescue Cancelled
-    # A human hit Stop/Abandon; the task is already blocked by the controller.
-    agent_run.update!(status: "cancelled")
-    Rails.logger.info("AgentRunJob##{agent_run.id} (#{agent_run.agent_type}) cancelled by request")
+    cancelled(agent_run)
   rescue PlateauMonitor::Plateaued, RobotLab::ToolLoopError => e
-    # A stuck run, caught early by the within-run monitor (or robot_lab's own
-    # circuit breaker). Block the whole task so the pipeline stops instead of
-    # burning more runs; a human can inspect and unblock (see #22/#23).
-    agent_run.update!(status: "blocked")
-    task.update!(blocked_reason: "no_progress")
-    Rails.logger.warn("AgentRunJob##{agent_run.id} (#{agent_run.agent_type}) plateaued: #{e.message}")
+    plateaued(agent_run, task, e)
   rescue StandardError => e
-    agent_run.update!(status: "failed")
-    Rails.logger.error("AgentRunJob##{agent_run.id} (#{agent_run.agent_type}) failed: #{e.class}: #{e.message}")
+    failed(agent_run, e)
   ensure
     # RobotLab connects the MCP clients when the robot is built; tear down their
     # stdio subprocesses when the turn ends.
     robot.disconnect if robot.respond_to?(:disconnect)
     recorder.finish
+  end
+
+  # A human hit Stop/Abandon; the task is already blocked by the controller.
+  def cancelled(agent_run)
+    agent_run.update!(status: "cancelled")
+    Rails.logger.info("#{tag(agent_run)} cancelled by request")
+  end
+
+  # A stuck run, caught early by the within-run monitor (or robot_lab's own
+  # circuit breaker). Block the whole task so the pipeline stops instead of
+  # burning more runs; a human can inspect, guide, and unblock (see #22/#23).
+  def plateaued(agent_run, task, error)
+    agent_run.update!(status: "blocked")
+    task.update!(blocked_reason: "no_progress")
+    Rails.logger.warn("#{tag(agent_run)} plateaued: #{error.message}")
+  end
+
+  def failed(agent_run, error)
+    agent_run.update!(status: "failed")
+    Rails.logger.error("#{tag(agent_run)} failed: #{error.inspect}")
+  end
+
+  def tag(agent_run)
+    "AgentRunJob##{agent_run.id} (#{agent_run.agent_type})"
   end
 
   # The opening message for the turn. Prepends any human redirect (#23) queued
