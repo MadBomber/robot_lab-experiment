@@ -1,11 +1,11 @@
 # Code coverage is opt-in (COVERAGE=1) so the normal parallel test run stays
-# fast; bin/ci turns it on to enforce the 90% line gate. Must start before any
-# application code is required so every file is tracked.
+# fast. SimpleCov only *measures* here (writing coverage/.last_run.json); the
+# 90% gate itself is owned and displayed by `asgard quality` (see .loki), so the
+# threshold lives in one place. Must start before any app code is required.
 if ENV["COVERAGE"]
   require "simplecov"
   SimpleCov.start "rails" do
     add_filter "/test/"
-    minimum_coverage line: 90
   end
 end
 

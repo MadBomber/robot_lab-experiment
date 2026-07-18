@@ -7,6 +7,10 @@
 class Tasks
   header "robot_lab-experiment — self-building RobotLab pipeline (Rails app)"
 
+  # Minimum line coverage (%) required by `asgard quality`. Change it here to
+  # move the gate; the summary always shows this threshold and the actual value.
+  COVERAGE_THRESHOLD = 90
+
   desc "Install dependencies and prepare the database"
   def setup
     sh "bin/setup"
@@ -85,7 +89,9 @@ class Tasks
   desc "Run all quality gates: tests + RuboCop + Flog + Flay + Reek + Rails Best Practices + security audits"
   def quality
     gates = [
-      ["Tests", "bin/rails test"],
+      # COVERAGE=1 runs the suite single-process under SimpleCov so the coverage
+      # gate below has fresh data; exit status still reflects tests only.
+      ["Tests", "env COVERAGE=1 bin/rails test"],
       ["RuboCop", "bin/rubocop"],
       ["Flog Complexity", "bin/rails flog_check"],
       ["Flay Duplication", "bin/rails flay_check"],
@@ -104,10 +110,39 @@ class Tasks
       [label, ok ? :pass : :fail]
     end
 
+    # Show coverage as its own pass/fail line right below Tests.
+    tests_idx = results.index { |label, _| label == "Tests" } || -1
+    results.insert(tests_idx + 1, coverage_gate)
+
     print_quality_summary(results)
   end
 
   no_commands do
+    # Coverage summary line for `asgard quality`, e.g.
+    #   [PASS] code coverage > 90% @ 96.98%
+    # Reads SimpleCov's last-run line coverage (written by the COVERAGE=1 Tests
+    # gate) and passes when it meets COVERAGE_THRESHOLD.
+    def coverage_gate
+      pct = line_coverage
+      label = if pct
+                format("code coverage > %d%% @ %.2f%%", COVERAGE_THRESHOLD, pct)
+              else
+                "code coverage > #{COVERAGE_THRESHOLD}% (no coverage data)"
+              end
+      [label, pct && pct >= COVERAGE_THRESHOLD ? :pass : :fail]
+    end
+
+    # SimpleCov's last-run line-coverage percentage, or nil if unavailable.
+    def line_coverage
+      require "json"
+      path = "coverage/.last_run.json"
+      return nil unless File.exist?(path)
+
+      JSON.parse(File.read(path)).dig("result", "line")
+    rescue StandardError
+      nil
+    end
+
     # Nearest ancestor (including cwd) containing +name+, or nil. Finds the
     # shared robot_lab_project/.reek.yml the same way import_up locates .loki
     # files, so this repo needs no .reek.yml of its own.
