@@ -7,7 +7,7 @@ class GrepTool < CodingTool
   param :glob, type: "string", desc: "Only search files matching this glob (e.g. '*.rb').", required: false
 
   def execute(pattern:, path: ".", glob: "**/*")
-    base = resolve_path(path)
+    base = resolve_read_path(path)
     raise RobotLab::ToolError, "no such directory: #{path}" unless File.directory?(base)
 
     regexp = compile(pattern)

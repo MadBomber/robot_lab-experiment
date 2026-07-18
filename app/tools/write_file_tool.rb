@@ -4,7 +4,7 @@ class WriteFileTool < CodingTool
   param :content, type: "string", desc: "The full content to write."
 
   def execute(path:, content:)
-    full = resolve_path(path)
+    full = resolve_write_path(path)
     FileUtils.mkdir_p(File.dirname(full))
     File.write(full, content)
     "Wrote #{content.bytesize} bytes to #{path}"

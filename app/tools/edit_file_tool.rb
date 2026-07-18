@@ -6,7 +6,7 @@ class EditFileTool < CodingTool
   param :replace_all, type: "boolean", desc: "Replace every occurrence instead of requiring exactly one.", required: false
 
   def execute(path:, old_string:, new_string:, replace_all: false)
-    full = resolve_path(path)
+    full = resolve_write_path(path)
     raise RobotLab::ToolError, "no such file: #{path}" unless File.file?(full)
 
     content = File.read(full)
