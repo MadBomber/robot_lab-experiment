@@ -27,6 +27,16 @@ module TaskDocument
     write(task, original_request.to_s)
   end
 
+  # Append a human redirect (#23) to a persistent "## Human Guidance" log in the
+  # doc, so it survives past the single run that consumes pending_guidance and
+  # every later agent re-reading the doc still sees it.
+  def append_guidance(task, guidance)
+    existing = read(task)
+    block = "## Human Guidance\n\n#{guidance.strip}\n"
+    body = existing.include?("## Human Guidance") ? "#{existing.rstrip}\n\n#{guidance.strip}\n" : "#{existing.rstrip}\n\n#{block}"
+    write(task, body.lstrip)
+  end
+
   def delete(task)
     path = doc_path(task)
     FileUtils.rm_f(path)

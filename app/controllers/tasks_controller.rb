@@ -1,6 +1,6 @@
 class TasksController < ApplicationController
   before_action :set_project
-  before_action :set_task, only: %i[show destroy unblock update_status heartbeat]
+  before_action :set_task, only: %i[show destroy unblock pause stop abandon guide update_status heartbeat]
 
   def new
     @task = @project.tasks.new
@@ -36,13 +36,54 @@ class TasksController < ApplicationController
 
   def clear_completed
     tasks = @project.tasks.completed.to_a
-    tasks.each { |task| delete_task!(task) }
-    redirect_to @project, notice: "Cleared #{tasks.size} completed #{'task'.pluralize(tasks.size)}."
+    # One task that fails to tear down (e.g. a stuck worktree, now that
+    # WorktreeService#remove surfaces those) must not abort the whole sweep.
+    failed = tasks.reject { |task| destroy_task(task) }
+    cleared = tasks.size - failed.size
+
+    notice = "Cleared #{cleared} completed #{'task'.pluralize(cleared)}."
+    notice += " #{failed.size} could not be deleted." if failed.any?
+    redirect_to @project, notice:
   end
 
   def unblock
     @task.unblock!
-    redirect_to [@project, @task], notice: "Task unblocked."
+    redirect_to [@project, @task], notice: "Task resumed."
+  end
+
+  # Stop auto-chaining but let the current run finish naturally.
+  def pause
+    @task.update!(blocked_reason: "human_requested")
+    redirect_to [@project, @task], notice: "Task paused -- it won't start another run."
+  end
+
+  # Halt the in-flight run now (cooperative cancel) and pause the pipeline.
+  def stop
+    request_cancel(@task.running_agent_run)
+    @task.update!(blocked_reason: "human_requested")
+    redirect_to [@project, @task], notice: "Stopping the current run."
+  end
+
+  # Give up on the task: halt any in-flight run and mark it abandoned.
+  def abandon
+    request_cancel(@task.running_agent_run)
+    @task.update!(blocked_reason: "abandoned")
+    redirect_to [@project, @task], notice: "Task abandoned."
+  end
+
+  # Human-in-the-loop redirect (#23): queue guidance for the task's next run and
+  # log it to the task doc. Applied the next time an agent runs (auto-chained, or
+  # after a Resume) -- to redirect an in-flight run, Stop it first, then guide.
+  def guide
+    guidance = params[:guidance].to_s.strip
+    if guidance.blank?
+      redirect_to [@project, @task], alert: "Guidance can't be blank."
+      return
+    end
+
+    @task.update!(pending_guidance: guidance)
+    TaskDocument.append_guidance(@task, guidance)
+    redirect_to [@project, @task], notice: "Guidance saved -- it will steer the next run."
   end
 
   # Manual escape hatch: the normal status is derived automatically from
@@ -87,6 +128,22 @@ class TasksController < ApplicationController
     WorktreeService.new(task).remove
     TaskDocument.delete_archive(task)
     task.destroy!
+  end
+
+  # Flag an in-flight run for cooperative cancellation; AgentRunJob picks it up
+  # between tool calls. No-op when nothing is running.
+  def request_cancel(agent_run)
+    agent_run&.update!(cancel_requested: true)
+  end
+
+  # Best-effort variant for bulk teardown: returns whether the task was deleted,
+  # logging (not raising) so one stuck task doesn't abort a clear_completed sweep.
+  def destroy_task(task)
+    delete_task!(task)
+    true
+  rescue => e
+    Rails.logger.error("clear_completed: could not delete task #{task.id}: #{e.message}")
+    false
   end
 
   def prefill_from_issue(number)

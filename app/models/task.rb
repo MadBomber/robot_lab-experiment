@@ -1,7 +1,12 @@
 class Task < ApplicationRecord
   MAX_WORKFLOW_RUNS = 25
 
-  BLOCKED_REASONS = %w[human_requested max_iterations].freeze
+  # Block a task once its progress fingerprint has repeated unchanged this many
+  # consecutive completion cycles (the first sighting establishes it, so this is
+  # roughly two full impl<->review cycles of no movement) -- see #record_progress!.
+  NO_PROGRESS_LIMIT = 3
+
+  BLOCKED_REASONS = %w[human_requested max_iterations no_progress abandoned].freeze
 
   belongs_to :project
   has_many :conversations, dependent: :destroy
@@ -48,7 +53,24 @@ class Task < ApplicationRecord
   end
 
   def unblock!
-    update!(blocked_reason: nil)
+    update!(blocked_reason: nil, no_progress_streak: 0)
+  end
+
+  # Record this cycle's progress fingerprint, growing the no-progress streak when
+  # it's unchanged from last cycle and resetting it when the task moved. Pair with
+  # #plateaued? to decide whether to stop chaining. See ProgressFingerprint.
+  def record_progress!(fingerprint)
+    if fingerprint == progress_fingerprint
+      increment!(:no_progress_streak)
+    else
+      update!(progress_fingerprint: fingerprint, no_progress_streak: 0)
+    end
+  end
+
+  # The progress fingerprint has stayed unchanged long enough that the pipeline is
+  # oscillating without moving forward -- the caller should block the task.
+  def plateaued?
+    no_progress_streak >= NO_PROGRESS_LIMIT
   end
 
   # The status enum is display-only state derived from the same flags

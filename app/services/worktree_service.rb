@@ -27,7 +27,14 @@ class WorktreeService
   def remove
     return unless @task.worktree_path?
 
-    run("git", "worktree", "remove", "--force", @task.worktree_path, chdir: @project.repo_folder_path)
+    _out, err, status = run("git", "worktree", "remove", "--force", @task.worktree_path, chdir: @project.repo_folder_path)
+    # git errors if the worktree is already gone -- that's a no-op success for us.
+    # But a real failure that leaves the directory behind (permissions, locked
+    # files, corrupt state) must surface, not be swallowed into a false success.
+    raise Error, "git worktree remove failed: #{err.strip}" if !status.success? && Dir.exist?(@task.worktree_path)
+
+    # Branch deletion stays best-effort: a missing branch (already deleted, or
+    # never created) is a normal, benign state and must not block teardown.
     run("git", "branch", "-D", @task.branch_name, chdir: @project.repo_folder_path) if @task.branch_name?
   end
 

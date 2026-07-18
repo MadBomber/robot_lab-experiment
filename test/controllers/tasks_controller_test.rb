@@ -19,6 +19,14 @@ class TasksControllerTest < ActionDispatch::IntegrationTest
     FileUtils.rm_rf("#{@repo_dir}-worktrees")
   end
 
+  # A task with a single running AgentRun, for the Stop/Pause/Abandon controls.
+  def running_task
+    task = Task.create!(project: @project, title: "Going", status: "in_progress")
+    conversation = Conversation.create!(task:, provider: "ollama", model: "qwen3.6:latest", started_at: Time.current)
+    run = AgentRun.create!(task:, conversation:, agent_type: "implementation", status: "running")
+    [task, run]
+  end
+
   test "heartbeat returns elapsed start time, message count, and last_message_created_at for a task with messages" do
     task = Task.create!(project: @project, title: "Add login", status: "in_progress")
     conversation = Conversation.create!(task:, provider: "openai", model: "gpt-4", started_at: 10.minutes.ago)
@@ -140,6 +148,74 @@ class TasksControllerTest < ActionDispatch::IntegrationTest
     delete clear_completed_project_tasks_url(@project)
     assert_redirected_to project_url(@project)
     assert Task.exists?(task.id)
+  end
+
+  test "clear_completed survives a task that fails to tear down and reports it" do
+    two = Array.new(2) { |i| Task.create!(project: @project, title: "Done #{i}", status: "completed") }
+
+    # Force teardown to blow up for every task; the sweep must not 500 -- it
+    # redirects, leaves the tasks in place, and reports the failures.
+    TaskDocument.stub(:delete_archive, ->(*) { raise "stuck worktree" }) do
+      delete clear_completed_project_tasks_url(@project)
+    end
+
+    assert_redirected_to project_url(@project)
+    assert_equal(2, two.count { |t| Task.exists?(t.id) })
+    assert_match "2 could not be deleted", flash[:notice]
+  end
+
+  test "pause blocks the task without cancelling the running run" do
+    task, run = running_task
+    post pause_project_task_url(@project, task)
+    assert_redirected_to project_task_url(@project, task)
+    assert_equal "human_requested", task.reload.blocked_reason
+    assert_not run.reload.cancel_requested?
+  end
+
+  test "stop requests cancellation of the running run and pauses the task" do
+    task, run = running_task
+    post stop_project_task_url(@project, task)
+    assert_redirected_to project_task_url(@project, task)
+    assert run.reload.cancel_requested?
+    assert_equal "human_requested", task.reload.blocked_reason
+  end
+
+  test "abandon cancels the running run and marks the task abandoned" do
+    task, run = running_task
+    post abandon_project_task_url(@project, task)
+    assert run.reload.cancel_requested?
+    assert_equal "abandoned", task.reload.blocked_reason
+  end
+
+  test "stop is safe when no run is in flight" do
+    task = Task.create!(project: @project, title: "Idle")
+    post stop_project_task_url(@project, task)
+    assert_redirected_to project_task_url(@project, task)
+    assert_equal "human_requested", task.reload.blocked_reason
+  end
+
+  test "guide queues guidance for the next run and logs it to the task doc" do
+    archive_root = Dir.mktmpdir("archive_root")
+    previous_env = ENV.fetch("ROBOT_LAB_EXPERIMENT_ARCHIVE_ROOT", nil)
+    ENV["ROBOT_LAB_EXPERIMENT_ARCHIVE_ROOT"] = archive_root
+    task = Task.create!(project: @project, title: "Going")
+
+    post guide_project_task_url(@project, task), params: { guidance: "use the Playwright MCP server" }
+
+    assert_redirected_to project_task_url(@project, task)
+    assert_equal "use the Playwright MCP server", task.reload.pending_guidance
+    assert_includes TaskDocument.read(task), "## Human Guidance"
+    assert_includes TaskDocument.read(task), "use the Playwright MCP server"
+  ensure
+    ENV["ROBOT_LAB_EXPERIMENT_ARCHIVE_ROOT"] = previous_env
+    FileUtils.rm_rf(archive_root)
+  end
+
+  test "guide rejects blank guidance" do
+    task = Task.create!(project: @project, title: "Going")
+    post guide_project_task_url(@project, task), params: { guidance: "   " }
+    assert_redirected_to project_task_url(@project, task)
+    assert_nil task.reload.pending_guidance
   end
 
   test "destroy removes worktree and archive" do

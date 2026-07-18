@@ -4,7 +4,7 @@ class AgentRunJobTest < ActiveSupport::TestCase
   FakeChunk = Struct.new(:content, :thinking)
 
   class FakeRobot
-    attr_reader :on_content, :on_tool_call, :on_tool_result, :local_tools, :mcp_servers
+    attr_reader :on_content, :on_tool_call, :on_tool_result, :local_tools, :mcp_servers, :ran_message
 
     def initialize(on_content:, on_tool_call:, on_tool_result:, local_tools:, mcp_servers: [], **)
       @on_content = on_content
@@ -14,7 +14,8 @@ class AgentRunJobTest < ActiveSupport::TestCase
       @mcp_servers = mcp_servers
     end
 
-    def run(_message, **)
+    def run(message, **)
+      @ran_message = message
       @on_tool_call.call(RubyLLM::ToolCall.new(id: "t1", name: "read_file", arguments: { path: "a.txt" }))
       @on_tool_result.call("contents of a.txt")
       @on_content.call(FakeChunk.new("Here is my answer.", nil))
@@ -25,6 +26,18 @@ class AgentRunJobTest < ActiveSupport::TestCase
   class RaisingRobot < FakeRobot
     def run(_message, **)
       raise "boom"
+    end
+  end
+
+  # Emits the identical tool call/result forever -- the within-run PlateauMonitor
+  # must interrupt it (this is the Task 21 PR-agent CI-polling loop, in miniature).
+  class LoopingRobot < FakeRobot
+    def run(_message, **)
+      call = RubyLLM::ToolCall.new(id: "t1", name: "bash", arguments: { command: "gh run view 123" })
+      loop do
+        @on_tool_call.call(call)
+        @on_tool_result.call("still failing")
+      end
     end
   end
 
@@ -63,6 +76,48 @@ class AgentRunJobTest < ActiveSupport::TestCase
     end
 
     assert @agent_run.reload.failed?
+  end
+
+  test "a run looping on the identical tool call is plateaued and blocks the task" do
+    RobotLab.stub(:build, ->(**kwargs) { LoopingRobot.new(**kwargs) }) do
+      assert_enqueued_with(job: AgentRunCompletionJob) do
+        AgentRunJob.perform_now(@agent_run.id)
+      end
+    end
+
+    assert_equal "blocked", @agent_run.reload.status
+    assert_equal "no_progress", @task.reload.blocked_reason
+  end
+
+  test "a run flagged cancel_requested stops cooperatively and is marked cancelled" do
+    @agent_run.update!(cancel_requested: true)
+
+    RobotLab.stub(:build, ->(**kwargs) { FakeRobot.new(**kwargs) }) do
+      AgentRunJob.perform_now(@agent_run.id)
+    end
+
+    assert_equal "cancelled", @agent_run.reload.status
+  end
+
+  test "pending guidance is injected into the run's kickoff message and then cleared" do
+    @task.update!(pending_guidance: "use the Playwright MCP server, not Selenium")
+
+    robot = nil
+    RobotLab.stub(:build, ->(**kwargs) { robot = FakeRobot.new(**kwargs) }) do
+      AgentRunJob.perform_now(@agent_run.id)
+    end
+
+    assert_match "use the Playwright MCP server", robot.ran_message
+    assert_nil @task.reload.pending_guidance
+  end
+
+  test "without pending guidance the kickoff message is just Begin." do
+    robot = nil
+    RobotLab.stub(:build, ->(**kwargs) { robot = FakeRobot.new(**kwargs) }) do
+      AgentRunJob.perform_now(@agent_run.id)
+    end
+
+    assert_equal "Begin.", robot.ran_message
   end
 
   test "gives the implementation agent no completion tools, only doc + coding tools" do

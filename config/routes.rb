@@ -13,6 +13,10 @@ Rails.application.routes.draw do
     resources :tasks, only: %i[new create show destroy] do
       resources :agent_runs, only: [:create]
       post :unblock, on: :member
+      post :pause, on: :member
+      post :stop, on: :member
+      post :abandon, on: :member
+      post :guide, on: :member
       patch :update_status, on: :member
       get :heartbeat, on: :member
       delete :clear_completed, on: :collection

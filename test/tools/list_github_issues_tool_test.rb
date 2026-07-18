@@ -10,14 +10,15 @@ class ListGithubIssuesToolTest < ActiveSupport::TestCase
     FileUtils.remove_entry(@dir)
   end
 
-  test "returns gh's output on success" do
-    Open3.stub(:capture3, ->(*_args, **_kwargs) { ['[{"number":1,"title":"Bug"}]', "", Struct.new(:success?).new(true)] }) do
-      assert_equal '[{"number":1,"title":"Bug"}]', @tool.execute
+  test "formats the parsed JSON as a readable #number title list" do
+    json = '[{"number":1,"title":"Bug"},{"number":42,"title":"Feature request"}]'
+    Open3.stub(:capture3, ->(*_args, **_kwargs) { [json, "", Struct.new(:success?).new(true)] }) do
+      assert_equal "#1 Bug\n#42 Feature request", @tool.execute
     end
   end
 
-  test "returns a friendly message when there are no open issues" do
-    Open3.stub(:capture3, ->(*_args, **_kwargs) { ["", "", Struct.new(:success?).new(true)] }) do
+  test "returns a friendly message when gh reports no open issues as []" do
+    Open3.stub(:capture3, ->(*_args, **_kwargs) { ["[]", "", Struct.new(:success?).new(true)] }) do
       assert_equal "No open issues.", @tool.execute
     end
   end
@@ -26,6 +27,13 @@ class ListGithubIssuesToolTest < ActiveSupport::TestCase
     Open3.stub(:capture3, ->(*_args, **_kwargs) { ["", "not a git repository", Struct.new(:success?).new(false)] }) do
       error = assert_raises(RobotLab::ToolError) { @tool.execute }
       assert_match "gh issue list failed", error.message
+    end
+  end
+
+  test "raises a clear error when gh output is not valid JSON" do
+    Open3.stub(:capture3, ->(*_args, **_kwargs) { ["not json", "", Struct.new(:success?).new(true)] }) do
+      error = assert_raises(RobotLab::ToolError) { @tool.execute }
+      assert_match "could not parse gh issue list output", error.message
     end
   end
 end

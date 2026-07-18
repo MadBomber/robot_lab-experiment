@@ -4,6 +4,10 @@
 # completion handler after a short settle delay (mirrors Bottega's own
 # settle-before-chaining race avoidance -- see AgentRunCompletionHandler).
 class AgentRunJob < ApplicationJob
+  # Raised to unwind a run that a human asked to Stop/Abandon (see #22). Caught
+  # in run_turn, which marks the run cancelled without treating it as a failure.
+  class Cancelled < StandardError; end
+
   queue_as :default
 
   SETTLE_DELAY = 1.second
@@ -23,15 +27,19 @@ class AgentRunJob < ApplicationJob
 
   def run_turn(agent_run, task, conversation, recorder)
     recorder.start
-    robot = build_robot(agent_run, task, conversation, recorder)
+    monitor = PlateauMonitor.new
+    robot = build_robot(agent_run, task, conversation, recorder, monitor)
     # Robot#run has its own `tools: :none` default, independent of local_tools
     # passed to RobotLab.build -- without this, the chat's tool list gets
     # wiped to empty on every turn and the LLM never sees any of our tools.
-    robot.run("Begin.", tools: :inherit)
+    robot.run(kickoff_message(task), tools: :inherit)
     agent_run.update!(status: "completed")
+  rescue Cancelled
+    cancelled(agent_run)
+  rescue PlateauMonitor::Plateaued, RobotLab::ToolLoopError => e
+    plateaued(agent_run, task, e)
   rescue StandardError => e
-    agent_run.update!(status: "failed")
-    Rails.logger.error("AgentRunJob##{agent_run.id} (#{agent_run.agent_type}) failed: #{e.class}: #{e.message}")
+    failed(agent_run, e)
   ensure
     # RobotLab connects the MCP clients when the robot is built; tear down their
     # stdio subprocesses when the turn ends.
@@ -39,7 +47,42 @@ class AgentRunJob < ApplicationJob
     recorder.finish
   end
 
-  def build_robot(agent_run, task, conversation, recorder)
+  # A human hit Stop/Abandon; the task is already blocked by the controller.
+  def cancelled(agent_run)
+    agent_run.update!(status: "cancelled")
+    Rails.logger.info("#{tag(agent_run)} cancelled by request")
+  end
+
+  # A stuck run, caught early by the within-run monitor (or robot_lab's own
+  # circuit breaker). Block the whole task so the pipeline stops instead of
+  # burning more runs; a human can inspect, guide, and unblock (see #22/#23).
+  def plateaued(agent_run, task, error)
+    agent_run.update!(status: "blocked")
+    task.update!(blocked_reason: "no_progress")
+    Rails.logger.warn("#{tag(agent_run)} plateaued: #{error.message}")
+  end
+
+  def failed(agent_run, error)
+    agent_run.update!(status: "failed")
+    Rails.logger.error("#{tag(agent_run)} failed: #{error.inspect}")
+  end
+
+  def tag(agent_run)
+    "AgentRunJob##{agent_run.id} (#{agent_run.agent_type})"
+  end
+
+  # The opening message for the turn. Prepends any human redirect (#23) queued
+  # since the last run and consumes it, so guidance applies to exactly this run.
+  def kickoff_message(task)
+    guidance = task.pending_guidance
+    return "Begin." if guidance.blank?
+
+    task.update!(pending_guidance: nil)
+    "A human overseeing this task has provided the following guidance. " \
+      "Follow it, adjusting your plan as needed:\n\n#{guidance}\n\nBegin."
+  end
+
+  def build_robot(agent_run, task, conversation, recorder, monitor)
     RobotLab.build(
       name: "#{agent_run.agent_type}-task-#{task.id}",
       template: agent_run.agent_type.to_sym,
@@ -48,9 +91,20 @@ class AgentRunJob < ApplicationJob
       model: conversation.model,
       local_tools: tools_for(agent_run, task),
       mcp_servers: mcp_servers_for(agent_run), # RobotLab connects them + injects their tools
+      max_tool_rounds: PlateauMonitor::MAX_TOOL_CALLS, # robot_lab's coarse circuit-breaker backstop
       on_content: ->(chunk) { recorder.record_content(chunk) },
-      on_tool_call: ->(tool_call) { recorder.record_tool_call(tool_call) },
-      on_tool_result: ->(result) { recorder.record_tool_result(result) }
+      on_tool_call: lambda { |tool_call|
+        recorder.record_tool_call(tool_call)
+        # Cooperative Stop/Abandon: a reload each tool call is a cheap way to see
+        # a cancel that was requested after this job started (see #22).
+        raise Cancelled if agent_run.reload.cancel_requested?
+
+        monitor.record_tool_call(tool_call)
+      },
+      on_tool_result: lambda { |result|
+        recorder.record_tool_result(result)
+        monitor.record_tool_result(result)
+      }
     )
   end
 
