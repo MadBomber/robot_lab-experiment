@@ -1,6 +1,6 @@
 class TasksController < ApplicationController
   before_action :set_project
-  before_action :set_task, only: %i[show destroy unblock update_status]
+  before_action :set_task, only: %i[show destroy unblock update_status heartbeat]
 
   def new
     @task = @project.tasks.new
@@ -53,6 +53,20 @@ class TasksController < ApplicationController
     redirect_to [@project, @task], notice: "Task status set to #{@task.status}."
   rescue ArgumentError
     redirect_to [@project, @task], alert: "'#{params[:status]}' is not a valid status."
+  end
+
+  def heartbeat
+    conversation = @task.conversations.order(created_at: :desc).first
+    if conversation
+      last_msg = conversation.messages.maximum(:created_at)
+      render json: {
+        started_at: conversation.started_at.to_s,
+        message_count: conversation.messages.count,
+        last_message_created_at: last_msg&.to_s
+      }
+    else
+      render json: { started_at: nil, message_count: 0, last_message_created_at: nil }
+    end
   end
 
   private

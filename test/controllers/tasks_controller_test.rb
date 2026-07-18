@@ -19,6 +19,34 @@ class TasksControllerTest < ActionDispatch::IntegrationTest
     FileUtils.rm_rf("#{@repo_dir}-worktrees")
   end
 
+  test "heartbeat returns elapsed start time, message count, and last_message_created_at for a task with messages" do
+    task = Task.create!(project: @project, title: "Add login", status: "in_progress")
+    conversation = Conversation.create!(task:, provider: "openai", model: "gpt-4", started_at: 10.minutes.ago)
+    Message.create!(conversation:, msg_type: :user, seq: 1, uuid: SecureRandom.uuid, payload: { content: "hello" },
+                    created_at: 8.minutes.ago)
+
+    get heartbeat_project_task_url(@project, task)
+
+    assert_response :success
+    json = JSON.parse(response.body)
+    assert_not_nil json["started_at"]
+    assert_equal conversation.started_at.to_s, json["started_at"]
+    assert_equal 1, json["message_count"]
+    assert_not_nil json["last_message_created_at"]
+  end
+
+  test "heartbeat returns zeros and nulls for a task with no conversations" do
+    task = Task.create!(project: @project, title: "Add login")
+
+    get heartbeat_project_task_url(@project, task)
+
+    assert_response :success
+    json = JSON.parse(response.body)
+    assert_nil json["started_at"]
+    assert_equal 0, json["message_count"]
+    assert_nil json["last_message_created_at"]
+  end
+
   test "create seeds the task doc with the description and creates a worktree" do
     archive_root = Dir.mktmpdir("archive_root")
     previous_env = ENV.fetch("ROBOT_LAB_EXPERIMENT_ARCHIVE_ROOT", nil)
