@@ -122,6 +122,31 @@ class AgentRunCompletionHandlerTest < ActiveSupport::TestCase
     assert_equal :started_pr, result.action
   end
 
+  test "blocks the task with no_progress once the progress fingerprint stalls" do
+    task = build_task(progress_fingerprint: "stuck", no_progress_streak: Task::NO_PROGRESS_LIMIT - 1)
+    run = finished_run(task, "review")
+
+    result = ProgressFingerprint.stub(:for, ->(_t) { "stuck" }) do
+      AgentRunCompletionHandler.call(run)
+    end
+
+    assert_equal :blocked_no_progress, result.action
+    assert_nil result.next_agent_run
+    assert_equal "no_progress", task.reload.blocked_reason
+  end
+
+  test "a changing progress fingerprint resets the streak and keeps chaining" do
+    task = build_task(progress_fingerprint: "old", no_progress_streak: 2)
+    run = finished_run(task, "implementation")
+
+    result = ProgressFingerprint.stub(:for, ->(_t) { "new" }) do
+      AgentRunCompletionHandler.call(run)
+    end
+
+    assert_equal :chained_to_review, result.action
+    assert_equal 0, task.reload.no_progress_streak
+  end
+
   test "a failed run never chains, regardless of flags" do
     task = build_task(workflow_complete: true)
     run = finished_run(task, "implementation", status: "failed")

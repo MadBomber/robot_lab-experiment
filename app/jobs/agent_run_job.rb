@@ -23,12 +23,20 @@ class AgentRunJob < ApplicationJob
 
   def run_turn(agent_run, task, conversation, recorder)
     recorder.start
-    robot = build_robot(agent_run, task, conversation, recorder)
+    monitor = PlateauMonitor.new
+    robot = build_robot(agent_run, task, conversation, recorder, monitor)
     # Robot#run has its own `tools: :none` default, independent of local_tools
     # passed to RobotLab.build -- without this, the chat's tool list gets
     # wiped to empty on every turn and the LLM never sees any of our tools.
     robot.run("Begin.", tools: :inherit)
     agent_run.update!(status: "completed")
+  rescue PlateauMonitor::Plateaued, RobotLab::ToolLoopError => e
+    # A stuck run, caught early by the within-run monitor (or robot_lab's own
+    # circuit breaker). Block the whole task so the pipeline stops instead of
+    # burning more runs; a human can inspect and unblock (see #22/#23).
+    agent_run.update!(status: "blocked")
+    task.update!(blocked_reason: "no_progress")
+    Rails.logger.warn("AgentRunJob##{agent_run.id} (#{agent_run.agent_type}) plateaued: #{e.message}")
   rescue StandardError => e
     agent_run.update!(status: "failed")
     Rails.logger.error("AgentRunJob##{agent_run.id} (#{agent_run.agent_type}) failed: #{e.class}: #{e.message}")
@@ -39,7 +47,7 @@ class AgentRunJob < ApplicationJob
     recorder.finish
   end
 
-  def build_robot(agent_run, task, conversation, recorder)
+  def build_robot(agent_run, task, conversation, recorder, monitor)
     RobotLab.build(
       name: "#{agent_run.agent_type}-task-#{task.id}",
       template: agent_run.agent_type.to_sym,
@@ -48,9 +56,16 @@ class AgentRunJob < ApplicationJob
       model: conversation.model,
       local_tools: tools_for(agent_run, task),
       mcp_servers: mcp_servers_for(agent_run), # RobotLab connects them + injects their tools
+      max_tool_rounds: PlateauMonitor::MAX_TOOL_CALLS, # robot_lab's coarse circuit-breaker backstop
       on_content: ->(chunk) { recorder.record_content(chunk) },
-      on_tool_call: ->(tool_call) { recorder.record_tool_call(tool_call) },
-      on_tool_result: ->(result) { recorder.record_tool_result(result) }
+      on_tool_call: lambda { |tool_call|
+        recorder.record_tool_call(tool_call)
+        monitor.record_tool_call(tool_call)
+      },
+      on_tool_result: lambda { |result|
+        recorder.record_tool_result(result)
+        monitor.record_tool_result(result)
+      }
     )
   end
 

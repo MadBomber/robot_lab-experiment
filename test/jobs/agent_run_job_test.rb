@@ -28,6 +28,18 @@ class AgentRunJobTest < ActiveSupport::TestCase
     end
   end
 
+  # Emits the identical tool call/result forever -- the within-run PlateauMonitor
+  # must interrupt it (this is the Task 21 PR-agent CI-polling loop, in miniature).
+  class LoopingRobot < FakeRobot
+    def run(_message, **)
+      call = RubyLLM::ToolCall.new(id: "t1", name: "bash", arguments: { command: "gh run view 123" })
+      loop do
+        @on_tool_call.call(call)
+        @on_tool_result.call("still failing")
+      end
+    end
+  end
+
   def setup
     @repo_dir = Dir.mktmpdir("agent_run_job_test_repo")
     Dir.chdir(@repo_dir) { system("git", "init", "--quiet") }
@@ -63,6 +75,17 @@ class AgentRunJobTest < ActiveSupport::TestCase
     end
 
     assert @agent_run.reload.failed?
+  end
+
+  test "a run looping on the identical tool call is plateaued and blocks the task" do
+    RobotLab.stub(:build, ->(**kwargs) { LoopingRobot.new(**kwargs) }) do
+      assert_enqueued_with(job: AgentRunCompletionJob) do
+        AgentRunJob.perform_now(@agent_run.id)
+      end
+    end
+
+    assert_equal "blocked", @agent_run.reload.status
+    assert_equal "no_progress", @task.reload.blocked_reason
   end
 
   test "gives the implementation agent no completion tools, only doc + coding tools" do

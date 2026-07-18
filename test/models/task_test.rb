@@ -90,10 +90,43 @@ class TaskTest < ActiveSupport::TestCase
     assert_equal [], task.reload.runnable_agent_types
   end
 
-  test "unblock! clears blocked_reason" do
-    task = Task.create!(project: @project, title: "Do the thing", blocked_reason: "human_requested")
+  test "unblock! clears blocked_reason and resets the no-progress streak" do
+    task = Task.create!(project: @project, title: "Do the thing", blocked_reason: "no_progress", no_progress_streak: 3)
     task.unblock!
     assert_not task.blocked?
+    assert_equal 0, task.no_progress_streak
+  end
+
+  test "no_progress is an accepted blocked_reason" do
+    task = Task.new(project: @project, title: "Do the thing", blocked_reason: "no_progress")
+    assert task.valid?
+  end
+
+  test "record_progress! grows the streak on an unchanged fingerprint until plateaued?" do
+    task = Task.create!(project: @project, title: "Do the thing")
+
+    # First sighting establishes the fingerprint at streak 0; only repeats count.
+    task.record_progress!("same-fp")
+    assert_not task.plateaued?
+
+    (Task::NO_PROGRESS_LIMIT - 1).times { task.record_progress!("same-fp") }
+    assert_not task.plateaued?, "not yet plateaued one repeat short of the limit"
+
+    task.record_progress!("same-fp")
+    assert task.plateaued?
+    assert_equal Task::NO_PROGRESS_LIMIT, task.no_progress_streak
+  end
+
+  test "record_progress! resets the streak when the fingerprint changes" do
+    task = Task.create!(project: @project, title: "Do the thing")
+    task.record_progress!("fp-1") # establish
+    task.record_progress!("fp-1")
+    task.record_progress!("fp-1")
+    assert_equal 2, task.no_progress_streak
+
+    task.record_progress!("fp-2")
+    assert_equal 0, task.no_progress_streak
+    assert_equal "fp-2", task.progress_fingerprint
   end
 
   test "task_kind defaults to fix" do

@@ -33,6 +33,15 @@ class AgentRunCompletionHandler
       return no_chain_with_broadcast(:blocked_max_iterations)
     end
 
+    # Cross-run plateau: if the task's progress fingerprint hasn't moved for
+    # several cycles, the impl<->review loop is oscillating without progress --
+    # block now rather than grinding to the iteration cap.
+    @task.record_progress!(ProgressFingerprint.for(@task))
+    if @task.plateaued?
+      @task.update!(blocked_reason: "no_progress")
+      return no_chain_with_broadcast(:blocked_no_progress)
+    end
+
     next_type = @agent_run.implementation? ? :review : :implementation
     start_with_broadcast(
       next_type,
