@@ -25,8 +25,11 @@ class PlateauMonitor
 
   # Same (tool, args) this many times in a row -> stuck repeating one action.
   IDENTICAL_CALL_LIMIT = 4
-  # Same result payload this many times total -> making calls but nothing changes.
-  IDENTICAL_RESULT_LIMIT = 5
+  # Same result payload this many times *in a row* -> the world isn't changing.
+  # Counted consecutively (not in total) so a normal edit->test->edit debug loop,
+  # where a differing result appears between repeats, doesn't false-positive --
+  # only a genuine "same output over and over, nothing in between" loop trips it.
+  IDENTICAL_RESULT_LIMIT = 6
   # Absolute ceiling on tool calls in a single run, regardless of variety. This
   # is a coarse backstop for a run that never repeats but never stops -- the
   # identical-call/result limits above catch real loops much earlier. Kept
@@ -43,7 +46,8 @@ class PlateauMonitor
     @total_calls = 0
     @last_call_fingerprint = nil
     @consecutive_identical_calls = 0
-    @result_counts = Hash.new(0)
+    @last_result_key = nil
+    @consecutive_identical_results = 0
   end
 
   # Raises Plateaued when the run has exceeded the total-call ceiling or is
@@ -65,14 +69,22 @@ class PlateauMonitor
     raise Plateaued, "repeated the same tool call #{@consecutive_identical_calls} times"
   end
 
-  # Raises Plateaued when one identical result (e.g. the same error) keeps coming
-  # back -- calls may vary superficially but the world isn't changing.
+  # Raises Plateaued when the identical result (e.g. the same error) keeps coming
+  # back with nothing different in between -- a run genuinely spinning in place.
+  # A single differing result (say, an edit that changes the next test output)
+  # resets the streak, so productive iteration isn't mistaken for a plateau.
   def record_tool_result(result)
     key = Digest::SHA256.hexdigest(result.to_s)
-    count = (@result_counts[key] += 1)
-    return if count < @identical_result_limit
+    if key == @last_result_key
+      @consecutive_identical_results += 1
+    else
+      @last_result_key = key
+      @consecutive_identical_results = 1
+    end
 
-    raise Plateaued, "the same tool result recurred #{count} times"
+    return if @consecutive_identical_results < @identical_result_limit
+
+    raise Plateaued, "the same tool result recurred #{@consecutive_identical_results} times in a row"
   end
 
   private

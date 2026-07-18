@@ -30,11 +30,22 @@ class PlateauMonitorTest < ActiveSupport::TestCase
     end
   end
 
-  test "trips when the identical result recurs past the limit" do
+  test "trips when the identical result recurs consecutively past the limit" do
     (PlateauMonitor::IDENTICAL_RESULT_LIMIT - 1).times { @monitor.record_tool_result("same error") }
 
     error = assert_raises(PlateauMonitor::Plateaued) { @monitor.record_tool_result("same error") }
     assert_match "same tool result recurred", error.message
+  end
+
+  test "a differing result between repeats resets the streak (edit/test debug loop)" do
+    # The Task 28 false positive: the same test failure recurs, but the agent
+    # makes an edit (a different result) between each run -- real iteration.
+    assert_nothing_raised do
+      (PlateauMonitor::IDENTICAL_RESULT_LIMIT * 3).times do
+        @monitor.record_tool_result("test failure: SyntaxError")
+        @monitor.record_tool_result("Replaced 1 occurrence(s)")
+      end
+    end
   end
 
   test "trips at the absolute tool-call ceiling even when calls vary" do
