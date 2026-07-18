@@ -4,7 +4,7 @@ class GlobTool < CodingTool
   param :path, type: "string", desc: "Subdirectory to search within, relative to the working directory.", required: false
 
   def execute(pattern:, path: ".")
-    base = resolve_path(path)
+    base = resolve_read_path(path)
     raise RobotLab::ToolError, "no such directory: #{path}" unless File.directory?(base)
 
     matches = Dir.glob(File.join(base, pattern))

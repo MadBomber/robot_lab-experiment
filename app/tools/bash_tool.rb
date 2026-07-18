@@ -8,7 +8,7 @@ require "timeout"
 class BashTool < CodingTool
   DEFAULT_TIMEOUT = 120
 
-  description "Run a shell command in the working directory and return its combined stdout+stderr."
+  description "Run a shell command in the working directory and return its combined stdout+stderr. Note: sandbox levels only apply to Ruby-level file reads; shell commands are confined by chdir but can access the filesystem through the OS."
   param :command, type: "string", desc: "The shell command to run."
   param :timeout, type: "integer", desc: "Max seconds to allow (default #{DEFAULT_TIMEOUT}).", required: false
 

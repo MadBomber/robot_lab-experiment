@@ -117,40 +117,45 @@ class AgentRunJob < ApplicationJob
   def tools_for(agent_run, task)
     doc_tools = [ReadTaskDocTool.new(task:), WriteTaskDocTool.new(task:)]
     cwd = task.effective_cwd
+    level = read_sandbox_level_for(agent_run.agent_type)
 
     case agent_run.agent_type
-    when "planning" then doc_tools + planning_tools(cwd, task)
-    when "implementation" then doc_tools + implementation_tools(cwd)
-    when "review" then doc_tools + review_tools(cwd, task)
-    when "pr" then doc_tools + pr_tools(cwd, task)
-    when "audit" then doc_tools + audit_tools(cwd)
+    when "planning" then doc_tools + planning_tools(cwd, level)
+    when "implementation" then doc_tools + implementation_tools(cwd, level)
+    when "review" then doc_tools + review_tools(cwd, task, level)
+    when "pr" then doc_tools + pr_tools(cwd, level)
+    when "audit" then doc_tools + audit_tools(cwd, level)
     end
   end
 
-  def planning_tools(cwd, task)
+  def read_sandbox_level_for(agent_type)
+    CodingTool.effective_sandbox_level(agent_type: agent_type)
+  end
+
+  def planning_tools(cwd, level)
     # RobotLab::AskUser reads from $stdin/$stdout, which has no meaningful
     # source in a background job -- it would hang the run. Clarifying
     # questions over the web UI are a later phase (extra/chat-ux.md); for now
     # the prompt instructs the agent to make a reasonable assumption instead.
-    [ReadFileTool.new(cwd:), GlobTool.new(cwd:), GrepTool.new(cwd:), MarkPlanningCompleteTool.new(task:)]
+    [ReadFileTool.new(cwd:, sandbox_level: level), GlobTool.new(cwd:, sandbox_level: level), GrepTool.new(cwd:, sandbox_level: level), MarkPlanningCompleteTool.new(task:)]
   end
 
-  def implementation_tools(cwd)
-    [ReadFileTool.new(cwd:), WriteFileTool.new(cwd:), EditFileTool.new(cwd:),
-     GlobTool.new(cwd:), GrepTool.new(cwd:), BashTool.new(cwd:)]
+  def implementation_tools(cwd, level)
+    [ReadFileTool.new(cwd:, sandbox_level: level), WriteFileTool.new(cwd:, sandbox_level: "tight"), EditFileTool.new(cwd:, sandbox_level: "tight"),
+     GlobTool.new(cwd:, sandbox_level: level), GrepTool.new(cwd:, sandbox_level: level), BashTool.new(cwd:)]
   end
 
-  def review_tools(cwd, task)
-    [ReadFileTool.new(cwd:), GlobTool.new(cwd:), GrepTool.new(cwd:), BashTool.new(cwd:),
+  def review_tools(cwd, task, level)
+    [ReadFileTool.new(cwd:, sandbox_level: level), GlobTool.new(cwd:, sandbox_level: level), GrepTool.new(cwd:, sandbox_level: level), BashTool.new(cwd:),
      MarkWorkflowCompleteTool.new(task:), MarkWorkflowBlockedTool.new(task:)]
   end
 
-  def pr_tools(cwd, task)
+  def pr_tools(cwd, level)
     [BashTool.new(cwd:), MarkPrCompleteTool.new(task:)]
   end
 
-  def audit_tools(cwd)
-    [ReadFileTool.new(cwd:), GlobTool.new(cwd:), GrepTool.new(cwd:),
+  def audit_tools(cwd, level)
+    [ReadFileTool.new(cwd:, sandbox_level: level), GlobTool.new(cwd:, sandbox_level: level), GrepTool.new(cwd:, sandbox_level: level),
      ListGithubIssuesTool.new(cwd:), CreateGithubIssueTool.new(cwd:)]
   end
 

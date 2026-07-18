@@ -3,7 +3,7 @@ class ReadFileTool < CodingTool
   param :path, type: "string", desc: "Path to the file, relative to the working directory."
 
   def execute(path:)
-    full = resolve_path(path)
+    full = resolve_read_path(path)
     raise RobotLab::ToolError, "no such file: #{path}" unless File.file?(full)
 
     File.read(full)
