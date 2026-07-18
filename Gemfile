@@ -68,4 +68,7 @@ group :test do
   # Use system testing [https://guides.rubyonrails.org/testing.html#system-testing]
   gem "capybara"
   gem "selenium-webdriver"
+
+  # Code coverage; the 90% line gate is enforced in test/test_helper.rb.
+  gem "simplecov", require: false
 end

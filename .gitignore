@@ -58,3 +58,6 @@ yarn-error.log
 
 # Playwright MCP screenshot/snapshot artifacts
 .playwright-mcp/
+
+# SimpleCov output
+/coverage/

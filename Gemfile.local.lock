@@ -471,6 +471,7 @@ GEM
       websocket (~> 1.0)
     sexp_processor (4.17.5)
     simple_flow (0.4.0)
+    simplecov (1.0.2)
     simpleidn (0.2.3)
     solid_cable (4.0.0)
       actioncable (>= 7.2)
@@ -570,6 +571,7 @@ DEPENDENCIES
   rubocop-rails
   ruby_llm
   selenium-webdriver
+  simplecov
   solid_cable
   solid_cache
   solid_queue
@@ -739,6 +741,7 @@ CHECKSUMS
   selenium-webdriver (4.46.0) sha256=cb6cfa6f79eac041749df0b14cdcb0e9fe5df3715a64c77bfaa56b345b99f957
   sexp_processor (4.17.5) sha256=ae2b48ba98353d5d465ce8759836b7a05f2e12c5879fcd14d7815b026de32f0e
   simple_flow (0.4.0) sha256=20690b39bd0895ff6085b7011454d38d80bb4602518aaf23ace714c5dfc55bcd
+  simplecov (1.0.2) sha256=c6459434efe4b948b46477cc2df2faa73ab365f83a33c7c17f81262f4f7f1244
   simpleidn (0.2.3) sha256=08ce96f03fa1605286be22651ba0fc9c0b2d6272c9b27a260bc88be05b0d2c29
   solid_cable (4.0.0) sha256=8379680ef6bf36e195eb876a6306ea290f87d5fa10bc4a757bc2a918f83229b5
   solid_cache (1.0.10) sha256=bc05a2fb3ac78a6f43cbb5946679cf9db67dd30d22939ededc385cb93e120d41
