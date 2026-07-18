@@ -102,6 +102,11 @@ class TaskTest < ActiveSupport::TestCase
     assert task.valid?
   end
 
+  test "abandoned is an accepted blocked_reason" do
+    task = Task.new(project: @project, title: "Do the thing", blocked_reason: "abandoned")
+    assert task.valid?
+  end
+
   test "record_progress! grows the streak on an unchanged fingerprint until plateaued?" do
     task = Task.create!(project: @project, title: "Do the thing")
 

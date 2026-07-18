@@ -1,6 +1,6 @@
 class TasksController < ApplicationController
   before_action :set_project
-  before_action :set_task, only: %i[show destroy unblock update_status heartbeat]
+  before_action :set_task, only: %i[show destroy unblock pause stop abandon update_status heartbeat]
 
   def new
     @task = @project.tasks.new
@@ -48,7 +48,27 @@ class TasksController < ApplicationController
 
   def unblock
     @task.unblock!
-    redirect_to [@project, @task], notice: "Task unblocked."
+    redirect_to [@project, @task], notice: "Task resumed."
+  end
+
+  # Stop auto-chaining but let the current run finish naturally.
+  def pause
+    @task.update!(blocked_reason: "human_requested")
+    redirect_to [@project, @task], notice: "Task paused -- it won't start another run."
+  end
+
+  # Halt the in-flight run now (cooperative cancel) and pause the pipeline.
+  def stop
+    request_cancel(@task.running_agent_run)
+    @task.update!(blocked_reason: "human_requested")
+    redirect_to [@project, @task], notice: "Stopping the current run."
+  end
+
+  # Give up on the task: halt any in-flight run and mark it abandoned.
+  def abandon
+    request_cancel(@task.running_agent_run)
+    @task.update!(blocked_reason: "abandoned")
+    redirect_to [@project, @task], notice: "Task abandoned."
   end
 
   # Manual escape hatch: the normal status is derived automatically from
@@ -93,6 +113,12 @@ class TasksController < ApplicationController
     WorktreeService.new(task).remove
     TaskDocument.delete_archive(task)
     task.destroy!
+  end
+
+  # Flag an in-flight run for cooperative cancellation; AgentRunJob picks it up
+  # between tool calls. No-op when nothing is running.
+  def request_cancel(agent_run)
+    agent_run&.update!(cancel_requested: true)
   end
 
   # Best-effort variant for bulk teardown: returns whether the task was deleted,

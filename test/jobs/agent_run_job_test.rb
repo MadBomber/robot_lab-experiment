@@ -88,6 +88,16 @@ class AgentRunJobTest < ActiveSupport::TestCase
     assert_equal "no_progress", @task.reload.blocked_reason
   end
 
+  test "a run flagged cancel_requested stops cooperatively and is marked cancelled" do
+    @agent_run.update!(cancel_requested: true)
+
+    RobotLab.stub(:build, ->(**kwargs) { FakeRobot.new(**kwargs) }) do
+      AgentRunJob.perform_now(@agent_run.id)
+    end
+
+    assert_equal "cancelled", @agent_run.reload.status
+  end
+
   test "gives the implementation agent no completion tools, only doc + coding tools" do
     captured = nil
     RobotLab.stub(:build, lambda { |**kwargs|

@@ -23,9 +23,20 @@
         <%= button_to "Run #{agent_type}", project_task_agent_runs_path(project, task),
               params: { agent_type: agent_type }, class: "bg-blue-600 text-white px-4 py-2 rounded" %>
       <% end %>
+      <% if task.running_agent_run.present? %>
+        <%= button_to "Stop", stop_project_task_path(project, task), method: :post,
+              class: "bg-red-600 text-white px-4 py-2 rounded" %>
+        <%= button_to "Pause", pause_project_task_path(project, task), method: :post,
+              class: "bg-yellow-600 text-white px-4 py-2 rounded" %>
+      <% end %>
       <% if task.blocked? %>
-        <%= button_to "Unblock", unblock_project_task_path(project, task), method: :post,
+        <%= button_to "Resume", unblock_project_task_path(project, task), method: :post,
               class: "bg-amber-600 text-white px-4 py-2 rounded" %>
+      <% end %>
+      <% unless task.completed? || task.blocked_reason == "abandoned" %>
+        <%= button_to "Abandon", abandon_project_task_path(project, task), method: :post,
+              data: { turbo_confirm: "Give up on this task and stop all agents?" },
+              class: "bg-gray-600 text-white px-4 py-2 rounded" %>
       <% end %>
     </div>
   </div>

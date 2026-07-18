@@ -4,6 +4,10 @@
 # completion handler after a short settle delay (mirrors Bottega's own
 # settle-before-chaining race avoidance -- see AgentRunCompletionHandler).
 class AgentRunJob < ApplicationJob
+  # Raised to unwind a run that a human asked to Stop/Abandon (see #22). Caught
+  # in run_turn, which marks the run cancelled without treating it as a failure.
+  class Cancelled < StandardError; end
+
   queue_as :default
 
   SETTLE_DELAY = 1.second
@@ -30,6 +34,10 @@ class AgentRunJob < ApplicationJob
     # wiped to empty on every turn and the LLM never sees any of our tools.
     robot.run("Begin.", tools: :inherit)
     agent_run.update!(status: "completed")
+  rescue Cancelled
+    # A human hit Stop/Abandon; the task is already blocked by the controller.
+    agent_run.update!(status: "cancelled")
+    Rails.logger.info("AgentRunJob##{agent_run.id} (#{agent_run.agent_type}) cancelled by request")
   rescue PlateauMonitor::Plateaued, RobotLab::ToolLoopError => e
     # A stuck run, caught early by the within-run monitor (or robot_lab's own
     # circuit breaker). Block the whole task so the pipeline stops instead of
@@ -60,6 +68,10 @@ class AgentRunJob < ApplicationJob
       on_content: ->(chunk) { recorder.record_content(chunk) },
       on_tool_call: lambda { |tool_call|
         recorder.record_tool_call(tool_call)
+        # Cooperative Stop/Abandon: a reload each tool call is a cheap way to see
+        # a cancel that was requested after this job started (see #22).
+        raise Cancelled if agent_run.reload.cancel_requested?
+
         monitor.record_tool_call(tool_call)
       },
       on_tool_result: lambda { |result|

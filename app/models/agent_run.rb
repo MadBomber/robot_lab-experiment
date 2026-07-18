@@ -3,6 +3,8 @@ class AgentRun < ApplicationRecord
   belongs_to :conversation
 
   enum :agent_type, { planning: "planning", implementation: "implementation", review: "review", pr: "pr", audit: "audit" }
-  enum :status, { pending: "pending", running: "running", completed: "completed", failed: "failed", blocked: "blocked" },
+  enum :status,
+       { pending: "pending", running: "running", completed: "completed",
+         failed: "failed", blocked: "blocked", cancelled: "cancelled" },
        default: "pending"
 end

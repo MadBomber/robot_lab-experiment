@@ -6,7 +6,7 @@ class Task < ApplicationRecord
   # roughly two full impl<->review cycles of no movement) -- see #record_progress!.
   NO_PROGRESS_LIMIT = 3
 
-  BLOCKED_REASONS = %w[human_requested max_iterations no_progress].freeze
+  BLOCKED_REASONS = %w[human_requested max_iterations no_progress abandoned].freeze
 
   belongs_to :project
   has_many :conversations, dependent: :destroy
