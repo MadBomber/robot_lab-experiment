@@ -1,7 +1,7 @@
 require "test_helper"
 
 class CodingToolTest < ActiveSupport::TestCase
-  # NOTE: parallelize_threshold not used in this Rails version; 
+  # NOTE: parallelize_threshold not used in this Rails version;
   # memoization is already isolated per-test-class in our test environment.
 
   def setup
@@ -66,13 +66,13 @@ class CodingToolTest < ActiveSupport::TestCase
   end
 
   test "sandbox_level root adds AGENT_READABLE_ROOT directories" do
-    original = ENV["AGENT_READABLE_ROOT"]
+    original = ENV.fetch("AGENT_READABLE_ROOT", nil)
     begin
       temp_dir = Dir.mktmpdir("root_test")
       File.write(File.join(temp_dir, "readable.txt"), "accessible via root")
 
       # Clear memoization to pick up the new env var.
-      CodingTool.instance_variable_set(:@_coding_tool_readable_roots, nil)
+      CodingTool.instance_variable_set(:@readable_roots, nil)
       ENV["AGENT_READABLE_ROOT"] = temp_dir
 
       coder = CodingTool.new(cwd: @dir, sandbox_level: "root")
@@ -80,7 +80,7 @@ class CodingToolTest < ActiveSupport::TestCase
     ensure
       original ? ENV["AGENT_READABLE_ROOT"] = original : ENV.delete("AGENT_READABLE_ROOT")
       FileUtils.remove_entry(temp_dir) if temp_dir && Dir.exist?(temp_dir) rescue nil
-      CodingTool.instance_variable_set(:@_coding_tool_readable_roots, nil)
+      CodingTool.instance_variable_set(:@readable_roots, nil)
     end
   end
 
@@ -127,7 +127,7 @@ class CodingToolTest < ActiveSupport::TestCase
   # -- write isolation in edit tool --
 
   test "edit paths never escape cwd even at loose level" do
-    File.write(File.join(@dir, "target.txt"), "original") if !File.exist?(File.join(@dir, "target.txt"))
+    File.write(File.join(@dir, "target.txt"), "original") unless File.exist?(File.join(@dir, "target.txt"))
     tool = EditFileTool.new(cwd: @dir, sandbox_level: "loose")
     error = assert_raises(RobotLab::ToolError) { tool.execute(path: "../escape.txt", old_string: "", new_string: "x") }
     assert_match(/escapes the working directory/, error.message)
@@ -145,7 +145,7 @@ class CodingToolTest < ActiveSupport::TestCase
   # -- env var fallback --
 
   test "effective_sandbox_level from AGENT_SANDBOX_LEVEL" do
-    original = ENV["AGENT_SANDBOX_LEVEL"]
+    original = ENV.fetch("AGENT_SANDBOX_LEVEL", nil)
     begin
       ENV["AGENT_SANDBOX_LEVEL"] = "loose"
       assert_equal "loose", CodingTool.effective_sandbox_level
@@ -158,7 +158,7 @@ class CodingToolTest < ActiveSupport::TestCase
   end
 
   test "effective_sandbox_level defaults to tight" do
-    original = ENV["AGENT_SANDBOX_LEVEL"]
+    original = ENV.fetch("AGENT_SANDBOX_LEVEL", nil)
     begin
       ENV.delete("AGENT_SANDBOX_LEVEL")
       assert_equal "tight", CodingTool.effective_sandbox_level
@@ -178,7 +178,7 @@ class CodingToolTest < ActiveSupport::TestCase
   end
 
   test "effective_sandbox_level uses agent_type override when present" do
-    original = ENV["AGENT_SANDBOX_LEVEL"]
+    original = ENV.fetch("AGENT_SANDBOX_LEVEL", nil)
     begin
       ENV.delete("AGENT_SANDBOX_LEVEL")
       assert_equal "root", CodingTool.effective_sandbox_level(agent_type: :review)
@@ -230,7 +230,7 @@ class CodingToolTest < ActiveSupport::TestCase
   end
 
   test "readable_roots is memoized on the CodingTool class object" do
-    original = ENV["AGENT_READABLE_ROOT"]
+    original = ENV.fetch("AGENT_READABLE_ROOT", nil)
     begin
       ENV["AGENT_READABLE_ROOT"] = ""
       coder1 = CodingTool.new(cwd: @dir, sandbox_level: "root")
@@ -240,7 +240,7 @@ class CodingToolTest < ActiveSupport::TestCase
       assert_same roots1, roots2, "readable_roots should return the same memoized array"
     ensure
       original ? ENV["AGENT_READABLE_ROOT"] = original : ENV.delete("AGENT_READABLE_ROOT")
-      CodingTool.instance_variable_set(:@_coding_tool_readable_roots, nil)
+      CodingTool.instance_variable_set(:@readable_roots, nil)
     end
   end
 

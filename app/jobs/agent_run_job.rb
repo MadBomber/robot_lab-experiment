@@ -137,16 +137,19 @@ class AgentRunJob < ApplicationJob
     # source in a background job -- it would hang the run. Clarifying
     # questions over the web UI are a later phase (extra/chat-ux.md); for now
     # the prompt instructs the agent to make a reasonable assumption instead.
-    [ReadFileTool.new(cwd:, sandbox_level: level), GlobTool.new(cwd:, sandbox_level: level), GrepTool.new(cwd:, sandbox_level: level), MarkPlanningCompleteTool.new(task:)]
+    [ReadFileTool.new(cwd:, sandbox_level: level), GlobTool.new(cwd:, sandbox_level: level), GrepTool.new(cwd:, sandbox_level: level),
+     MarkPlanningCompleteTool.new(task:)]
   end
 
   def implementation_tools(cwd, level)
-    [ReadFileTool.new(cwd:, sandbox_level: level), WriteFileTool.new(cwd:, sandbox_level: "tight"), EditFileTool.new(cwd:, sandbox_level: "tight"),
+    [ReadFileTool.new(cwd:, sandbox_level: level),
+     WriteFileTool.new(cwd:, sandbox_level: "tight"), EditFileTool.new(cwd:, sandbox_level: "tight"),
      GlobTool.new(cwd:, sandbox_level: level), GrepTool.new(cwd:, sandbox_level: level), BashTool.new(cwd:)]
   end
 
   def review_tools(cwd, task, level)
-    [ReadFileTool.new(cwd:, sandbox_level: level), GlobTool.new(cwd:, sandbox_level: level), GrepTool.new(cwd:, sandbox_level: level), BashTool.new(cwd:),
+    [ReadFileTool.new(cwd:, sandbox_level: level), GlobTool.new(cwd:, sandbox_level: level),
+     GrepTool.new(cwd:, sandbox_level: level), BashTool.new(cwd:),
      MarkWorkflowCompleteTool.new(task:), MarkWorkflowBlockedTool.new(task:)]
   end
 

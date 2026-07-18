@@ -25,6 +25,28 @@ class CodingTool < RobotLab::Tool
     def effective_sandbox_level(agent_type: nil)
       agent_type_override(agent_type) || ENV.fetch("AGENT_SANDBOX_LEVEL", "tight").to_s.downcase
     end
+
+    # Memoized set of bundled gem paths (readable at the loose + root levels).
+    def read_roots
+      @read_roots ||= begin
+        paths = []
+        if defined?(Bundler) && Bundler.respond_to?(:load)
+          specs = Bundler.load.specs
+          paths.concat(specs.map(&:full_gem_path).uniq) if specs
+        end
+        paths
+      end
+    end
+
+    # Memoized directories from AGENT_READABLE_ROOT (comma- or newline-delimited).
+    def readable_roots
+      @readable_roots ||= ENV.fetch("AGENT_READABLE_ROOT", "")
+                             .tr(",", "\n")
+                             .split("\n")
+                             .map(&:strip)
+                             .reject(&:empty?)
+                             .map { |r| File.expand_path(r) }
+    end
   end
 
   # Write access is always cwd-confined at every sandbox level (alias for
@@ -45,100 +67,28 @@ class CodingTool < RobotLab::Tool
   # Resolve a path relative to +cwd+ and refuse anything that escapes it.
   # Used by *write* tools at *every* sandbox level -- no exceptions.
   def resolve_write_path(path)
-    full = File.expand_path(path.to_s, cwd)
-    return full if full == cwd || full.start_with?("#{cwd}/")
-
-    raise RobotLab::ToolError, "path escapes the working directory: #{path}"
+    resolve_confined(path)
   end
 
   # ------------------------------------------------------------------ read
 
   # Router -- delegates to the level-specific resolver.
   def resolve_read_path(path)
-    level = sandbox_level
-    case level
-    when "loose" then resolve_read_loose(path)
-    when "root"  then resolve_read_root(path)
-    when "none"  then resolve_read_unrestricted(path)
-    else                resolve_read_tight(path)  # tight + any unknown value
+    case sandbox_level
+    when "loose" then resolve_confined(path, read_roots)
+    when "root"  then resolve_confined(path, readable_roots + read_roots)
+    when "none"  then File.expand_path(path.to_s, cwd)
+    else              resolve_confined(path) # tight + any unknown value
     end
   end
 
-  def resolve_read_unrestricted(path)
-    File.expand_path(path.to_s, cwd)
-  end
-
-  def resolve_read_tight(path)
+  # cwd is always allowed; otherwise the path must live under one of +extra_roots+
+  # (empty for cwd-only confinement, which is every write and the tight read).
+  def resolve_confined(path, extra_roots = [])
     full = File.expand_path(path.to_s, cwd)
-    return full if full == cwd || full.start_with?("#{cwd}/")
+    return full if ([cwd] + extra_roots).any? { |root| full == root || full.start_with?("#{root}/") }
 
     raise RobotLab::ToolError, "path escapes the working directory: #{path}"
-  end
-
-  def resolve_read_loose(path)
-    # Tight check first -- handles everything inside cwd quickly.
-    tight = File.expand_path(path.to_s, cwd)
-    return tight if tight == cwd || tight.start_with?("#{cwd}/")
-
-    # Fall back to bundler gem paths.
-    expanded = File.expand_path(path.to_s, cwd)
-    read_roots.each do |root|
-      return expanded if expanded == root || expanded.start_with?("#{root}/")
-    end
-
-    raise RobotLab::ToolError, "path escapes the working directory: #{path}"
-  end
-
-  def resolve_read_root(path)
-    tight = File.expand_path(path.to_s, cwd)
-
-    # cwd is always readable.
-    return tight if tight == cwd || tight.start_with?("#{cwd}/")
-
-    expanded = File.expand_path(path.to_s, cwd)
-
-    # AGENT_READABLE_ROOT entries (colon- or comma-delimited).
-    readable_roots.each do |root|
-      return expanded if expanded == root || expanded.start_with?("#{root}/")
-    end
-
-    # Also allow all bundled gem paths.
-    read_roots.each do |root|
-      return expanded if expanded == root || expanded.start_with?("#{root}/")
-    end
-
-    raise RobotLab::ToolError, "path escapes the working directory: #{path}"
-  end
-
-  def self.read_roots
-    # Memoized class-level set of bundled gem paths (loose + root levels).
-    @_coding_tool_read_roots ||= begin
-      paths = []
-      if defined?(Bundler) && Bundler.respond_to?(:load)
-        specs = Bundler.load.specs
-        return paths unless specs
-
-        paths.concat(specs.map { |s| s.full_gem_path }.uniq)
-      end
-      paths
-    end
-  end
-
-  def self.readable_roots
-    # Directories from AGENT_READABLE_ROOT (colon- or comma-delimited).
-    @_coding_tool_readable_roots ||= begin
-      raw = ENV.fetch("AGENT_READABLE_ROOT", "")
-      next_result = []
-      if raw.strip.empty?
-        next_result
-      else
-        raw.tr(",", "\n")
-           .split("\n")
-           .map(&:strip)
-           .reject { |r| r.empty? }
-           .map { |r| File.expand_path(r) }
-      end
-    end
   end
 
   # Instance methods delegate to class-level memoized data.
