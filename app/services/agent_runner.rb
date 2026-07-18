@@ -24,7 +24,6 @@ class AgentRunner
     raise AlreadyRunningError, "task #{@task.id} already has a running agent" if @task.running_agent_run
 
     @task.increment!(:workflow_run_count)
-    @task.update!(status: "in_progress") if @task.pending?
 
     conversation = Conversation.create!(
       task: @task, provider:, model:, started_at: Time.current
@@ -32,6 +31,7 @@ class AgentRunner
     agent_run = AgentRun.create!(
       task: @task, conversation:, agent_type: agent_type.to_s, status: "running"
     )
+    @task.recompute_status!
 
     AgentRunJob.perform_later(agent_run.id)
     agent_run

@@ -55,6 +55,18 @@ class ProjectsControllerTest < ActionDispatch::IntegrationTest
     assert_select "a[href=?]", new_project_task_path(project, from_issue: 5), text: "Create task"
   end
 
+  test "show shows a Clear completed tasks button only when a task is completed" do
+    project = Project.create!(name: "Demo", repo_folder_path: @repo_dir)
+    Task.create!(project:, title: "Not done yet")
+    get project_url(project)
+    assert_response :success
+    assert_select "form[action=?] button", clear_completed_project_tasks_path(project), count: 0
+
+    Task.create!(project:, title: "All done", status: "completed")
+    get project_url(project)
+    assert_select "form[action=?] button", clear_completed_project_tasks_path(project), text: "Clear completed tasks"
+  end
+
   test "edit shows the form" do
     project = Project.create!(name: "Demo", repo_folder_path: @repo_dir)
     get edit_project_url(project)

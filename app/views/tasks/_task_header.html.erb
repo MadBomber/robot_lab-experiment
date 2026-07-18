@@ -2,15 +2,21 @@
   <div id="task-header">
     <p class="text-sm text-gray-500 mb-1"><%= link_to project.name, project %></p>
     <h1 class="text-2xl font-bold mb-1"><%= task.title %></h1>
-    <p class="text-sm text-gray-500 mb-4">
-      status: <%= task.status %>
-      &middot; runs: <%= task.workflow_run_count %>/<%= Task::MAX_WORKFLOW_RUNS %>
-      <% if task.blocked? %>
-        &middot; <span class="text-red-600 font-medium">blocked (<%= task.blocked_reason %>)</span>
+    <p class="text-sm text-gray-500 mb-4 flex items-center gap-2 flex-wrap">
+      <span>
+        status: <%= task.status %>
+        &middot; runs: <%= task.workflow_run_count %>/<%= Task::MAX_WORKFLOW_RUNS %>
+        <% if task.blocked? %>
+          &middot; <span class="text-red-600 font-medium">blocked (<%= task.blocked_reason %>)</span>
+        <% end %>
+      </span>
+      <%= form_with url: update_status_project_task_path(project, task), method: :patch, class: "inline-flex items-center gap-1" do |f| %>
+        <%= f.select :status, Task.statuses.keys, { selected: task.status }, class: "text-xs border rounded" %>
+        <%= f.submit "Set status", class: "text-xs bg-gray-200 hover:bg-gray-300 px-2 py-1 rounded cursor-pointer" %>
       <% end %>
     </p>
 
-    <%= render "tasks/agent_status", running: task.running_agent_run.present? %>
+    <%= render "tasks/agent_status", running: task.running_agent_run.present?, task: %>
 
     <div class="mb-6 space-x-2">
       <% task.runnable_agent_types.each do |agent_type| %>

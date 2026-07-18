@@ -19,6 +19,34 @@ class TasksControllerTest < ActionDispatch::IntegrationTest
     FileUtils.rm_rf("#{@repo_dir}-worktrees")
   end
 
+  test "heartbeat returns elapsed start time, message count, and last_message_created_at for a task with messages" do
+    task = Task.create!(project: @project, title: "Add login", status: "in_progress")
+    conversation = Conversation.create!(task:, provider: "openai", model: "gpt-4", started_at: 10.minutes.ago)
+    Message.create!(conversation:, msg_type: :user, seq: 1, uuid: SecureRandom.uuid, payload: { content: "hello" },
+                    created_at: 8.minutes.ago)
+
+    get heartbeat_project_task_url(@project, task)
+
+    assert_response :success
+    json = JSON.parse(response.body)
+    assert_not_nil json["started_at"]
+    assert_equal conversation.started_at.to_s, json["started_at"]
+    assert_equal 1, json["message_count"]
+    assert_not_nil json["last_message_created_at"]
+  end
+
+  test "heartbeat returns zeros and nulls for a task with no conversations" do
+    task = Task.create!(project: @project, title: "Add login")
+
+    get heartbeat_project_task_url(@project, task)
+
+    assert_response :success
+    json = JSON.parse(response.body)
+    assert_nil json["started_at"]
+    assert_equal 0, json["message_count"]
+    assert_nil json["last_message_created_at"]
+  end
+
   test "create seeds the task doc with the description and creates a worktree" do
     archive_root = Dir.mktmpdir("archive_root")
     previous_env = ENV.fetch("ROBOT_LAB_EXPERIMENT_ARCHIVE_ROOT", nil)
@@ -68,6 +96,50 @@ class TasksControllerTest < ActionDispatch::IntegrationTest
     post unblock_project_task_url(@project, task)
     assert_redirected_to project_task_url(@project, task)
     assert_not task.reload.blocked?
+  end
+
+  test "update_status manually overrides the task's status" do
+    task = Task.create!(project: @project, title: "Add login")
+    patch update_status_project_task_url(@project, task), params: { status: "completed" }
+    assert_redirected_to project_task_url(@project, task)
+    assert task.reload.completed?
+  end
+
+  test "update_status rejects an unknown status value" do
+    task = Task.create!(project: @project, title: "Add login")
+    patch update_status_project_task_url(@project, task), params: { status: "vibes" }
+    assert_redirected_to project_task_url(@project, task)
+    assert task.reload.pending?
+  end
+
+  test "clear_completed deletes only completed tasks, including their worktrees and archives" do
+    archive_root = Dir.mktmpdir("archive_root")
+    previous_env = ENV.fetch("ROBOT_LAB_EXPERIMENT_ARCHIVE_ROOT", nil)
+    ENV["ROBOT_LAB_EXPERIMENT_ARCHIVE_ROOT"] = archive_root
+
+    post project_tasks_url(@project), params: { task: { title: "Done task", description: "d" } }
+    done_task = @project.tasks.find_by!(title: "Done task")
+    post project_tasks_url(@project), params: { task: { title: "Still going", description: "d" } }
+    active_task = @project.tasks.find_by!(title: "Still going")
+    patch update_status_project_task_url(@project, done_task), params: { status: "completed" }
+
+    delete clear_completed_project_tasks_url(@project)
+
+    assert_redirected_to project_url(@project)
+    refute Task.exists?(done_task.id)
+    refute Dir.exist?(done_task.worktree_path)
+    assert Task.exists?(active_task.id)
+    assert Dir.exist?(active_task.worktree_path)
+  ensure
+    ENV["ROBOT_LAB_EXPERIMENT_ARCHIVE_ROOT"] = previous_env
+    FileUtils.rm_rf(archive_root) if defined?(archive_root)
+  end
+
+  test "clear_completed is a no-op when nothing is completed" do
+    task = Task.create!(project: @project, title: "Still going")
+    delete clear_completed_project_tasks_url(@project)
+    assert_redirected_to project_url(@project)
+    assert Task.exists?(task.id)
   end
 
   test "destroy removes worktree and archive" do

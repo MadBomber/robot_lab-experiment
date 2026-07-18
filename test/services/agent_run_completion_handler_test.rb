@@ -22,6 +22,15 @@ class AgentRunCompletionHandlerTest < ActiveSupport::TestCase
     assert_equal 0, task.agent_runs.where.not(id: run.id).count
   end
 
+  test "planning finishing with planning_complete set moves task status to in_review" do
+    task = build_task(planning_complete: true)
+    run = finished_run(task, "planning")
+
+    AgentRunCompletionHandler.call(run)
+
+    assert_equal "in_review", task.reload.status
+  end
+
   test "audit finishing always stops, even if other flags would otherwise chain" do
     task = build_task(workflow_complete: true, task_kind: "audit")
     run = finished_run(task, "audit")
@@ -31,6 +40,15 @@ class AgentRunCompletionHandlerTest < ActiveSupport::TestCase
     assert_equal :stopped_after_audit, result.action
     assert_nil result.next_agent_run
     assert_equal 0, task.agent_runs.where.not(id: run.id).count
+  end
+
+  test "audit finishing successfully moves task status to completed" do
+    task = build_task(task_kind: "audit")
+    run = finished_run(task, "audit")
+
+    AgentRunCompletionHandler.call(run)
+
+    assert_equal "completed", task.reload.status
   end
 
   test "implementation finishing with no flags chains to review" do
@@ -71,6 +89,7 @@ class AgentRunCompletionHandlerTest < ActiveSupport::TestCase
 
     assert_equal :already_complete, result.action
     assert_nil result.next_agent_run
+    assert_equal "completed", task.reload.status
   end
 
   test "review setting blocked_reason (BLOCKED) stops the loop" do

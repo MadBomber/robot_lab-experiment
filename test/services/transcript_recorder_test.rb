@@ -77,6 +77,17 @@ class TranscriptRecorderTest < ActiveSupport::TestCase
     assert_equal([true, false], calls.map { |kwargs| kwargs.dig(:locals, :running) })
   end
 
+  test "status broadcast passes the task so the agent_status partial can build its heartbeat URL" do
+    calls = []
+    Turbo::StreamsChannel.stub(:broadcast_replace_to, ->(*_args, **kwargs) { calls << kwargs }) do
+      @recorder.start
+      @recorder.finish
+    end
+
+    assert(calls.all? { |kwargs| kwargs.dig(:locals, :task) == @conversation.task },
+           "every agent_status broadcast must include task: (omitting it raises in the partial mid-run)")
+  end
+
   test "seq numbers stay monotonic across flush boundaries and a fresh recorder" do
     @recorder.record_content(FakeChunk.new(nil, FakeThinking.new("thinking")))
     @recorder.record_tool_call(RubyLLM::ToolCall.new(id: "t1", name: "read_file", arguments: {}))

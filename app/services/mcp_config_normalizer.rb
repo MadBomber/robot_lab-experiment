@@ -66,28 +66,30 @@ class McpConfigNormalizer
   end
 
   def transport_for(name, spec)
-    case (type = resolved_type(name, spec))
+    command, args, env, url, headers, type = spec.values_at("command", "args", "env", "url", "headers", "type")
+
+    case (transport = resolved_type(name, type, command, url))
     when "stdio"
-      raise Error, "server '#{name}': stdio transport requires a command" if spec["command"].blank?
+      raise Error, "server '#{name}': stdio transport requires a command" if command.blank?
 
-      { type: "stdio", command: spec["command"], args: Array(spec["args"]), env: spec["env"] }.compact
+      { type: "stdio", command:, args: Array(args), env: }.compact
     when "sse", "streamable-http"
-      raise Error, "server '#{name}': #{type} transport requires a url" if spec["url"].blank?
+      raise Error, "server '#{name}': #{transport} transport requires a url" if url.blank?
 
-      { type: type, url: spec["url"], headers: spec["headers"] }.compact
+      { type: transport, url:, headers: }.compact
     when "ws"
-      raise Error, "server '#{name}': ws transport requires a url" if spec["url"].blank?
+      raise Error, "server '#{name}': ws transport requires a url" if url.blank?
 
-      { type: "ws", url: spec["url"] }
+      { type: "ws", url: }
     end
   end
 
   # Explicit "type" wins; otherwise infer from command/url.
-  def resolved_type(name, spec)
-    explicit = spec["type"].to_s.downcase.strip
+  def resolved_type(name, type, command, url)
+    explicit = type.to_s.downcase.strip
     return normalize_type(name, explicit) if explicit.present?
-    return "stdio" if spec["command"].present?
-    return "streamable-http" if spec["url"].present?
+    return "stdio" if command.present?
+    return "streamable-http" if url.present?
 
     raise Error, "server '#{name}': cannot determine transport (no type, command, or url)"
   end

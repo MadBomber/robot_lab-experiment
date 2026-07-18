@@ -13,6 +13,7 @@ class AgentRunCompletionHandler
   def initialize(agent_run)
     @agent_run = agent_run
     @task = agent_run.task.reload
+    @task.recompute_status!
   end
 
   def call
