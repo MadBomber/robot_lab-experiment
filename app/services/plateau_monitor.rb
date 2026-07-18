@@ -27,8 +27,12 @@ class PlateauMonitor
   IDENTICAL_CALL_LIMIT = 4
   # Same result payload this many times total -> making calls but nothing changes.
   IDENTICAL_RESULT_LIMIT = 5
-  # Absolute ceiling on tool calls in a single run, regardless of variety.
-  MAX_TOOL_CALLS = 50
+  # Absolute ceiling on tool calls in a single run, regardless of variety. This
+  # is a coarse backstop for a run that never repeats but never stops -- the
+  # identical-call/result limits above catch real loops much earlier. Kept
+  # generous so a legitimately busy implementation run (many varied reads/edits/
+  # test runs) isn't guillotined; true loops trip the finer detectors first.
+  MAX_TOOL_CALLS = 200
 
   def initialize(identical_call_limit: IDENTICAL_CALL_LIMIT,
                  identical_result_limit: IDENTICAL_RESULT_LIMIT,
