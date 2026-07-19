@@ -58,7 +58,11 @@ class AgentRunJob < ApplicationJob
   # burning more runs; a human can inspect, guide, and unblock (see #22/#23).
   def plateaued(agent_run, task, error)
     agent_run.update!(status: "blocked")
-    task.update!(blocked_reason: "no_progress")
+    task.update!(
+      blocked_reason: "no_progress",
+      blocked_detail: "#{error.message} during run ##{agent_run.id} (#{agent_run.agent_type})",
+      blocked_run_id: agent_run.id
+    )
     Rails.logger.warn("#{tag(agent_run)} plateaued: #{error.message}")
   end
 

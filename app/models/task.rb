@@ -53,7 +53,7 @@ class Task < ApplicationRecord
   end
 
   def unblock!
-    update!(blocked_reason: nil, no_progress_streak: 0)
+    update!(blocked_reason: nil, blocked_detail: nil, blocked_run_id: nil, no_progress_streak: 0)
   end
 
   # Record this cycle's progress fingerprint, growing the no-progress streak when
