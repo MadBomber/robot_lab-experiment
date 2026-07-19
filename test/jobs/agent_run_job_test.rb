@@ -133,6 +133,47 @@ class AgentRunJobTest < ActiveSupport::TestCase
     assert(captured.any?(BashTool))
   end
 
+  test "gives the planning agent read/search tools plus the planning completion tool" do
+    planning_run = AgentRun.create!(
+      task: @task,
+      conversation: Conversation.create!(task: @task, provider: "ollama", model: "qwen3.6:latest", started_at: Time.current),
+      agent_type: "planning",
+      status: "running"
+    )
+
+    captured = nil
+    RobotLab.stub(:build, lambda { |**kwargs|
+      captured = kwargs[:local_tools]
+      FakeRobot.new(**kwargs)
+    }) do
+      AgentRunJob.perform_now(planning_run.id)
+    end
+
+    assert(captured.any?(MarkPlanningCompleteTool))
+    assert(captured.any?(ReadFileTool))
+    assert_empty captured.grep(BashTool), "planning must not get a shell"
+  end
+
+  test "gives the pr agent bash plus the pr completion tool" do
+    pr_run = AgentRun.create!(
+      task: @task,
+      conversation: Conversation.create!(task: @task, provider: "ollama", model: "qwen3.6:latest", started_at: Time.current),
+      agent_type: "pr",
+      status: "running"
+    )
+
+    captured = nil
+    RobotLab.stub(:build, lambda { |**kwargs|
+      captured = kwargs[:local_tools]
+      FakeRobot.new(**kwargs)
+    }) do
+      AgentRunJob.perform_now(pr_run.id)
+    end
+
+    assert(captured.any?(MarkPrCompleteTool))
+    assert(captured.any?(BashTool))
+  end
+
   test "gives the review agent the workflow completion tools but not the planning one" do
     review_run = AgentRun.create!(
       task: @task,
