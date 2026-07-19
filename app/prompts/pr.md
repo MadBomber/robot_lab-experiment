@@ -13,10 +13,15 @@ Current PR status: <%= pr_status %>
 ## Step 1 -- create or verify the PR
 
 - If a PR already exists for this branch, skip straight to Step 2.
-- Otherwise: commit any uncommitted changes. If there is nothing ahead of the base
-  branch and nothing was uncommitted, there is nothing to submit -- call
-  mark_pr_complete immediately and stop. Otherwise push the branch and open a PR
-  (`gh pr create`) with a short title and a concise summary referencing the task.
+- Otherwise: commit any uncommitted changes. If -- and only if -- there is nothing
+  ahead of the base branch AND nothing was uncommitted, there is genuinely nothing
+  to submit; call mark_pr_complete and stop. Otherwise push the branch and open a
+  PR (`gh pr create`) with a short title and a concise summary referencing the task.
+- Producing the artifacts is the job, not signalling that you did. `mark_pr_complete`
+  verifies ground truth before it accepts completion: it refuses while the worktree
+  has uncommitted changes, and (when a GitHub remote exists) while no open PR exists
+  for the branch. If it returns a "you must do X first" message, do X and call it
+  again -- do not treat the stage as finished until it returns success.
 - Check the task doc's "## Original Request" section for a GitHub issue URL (it
   looks like "(from https://github.com/OWNER/REPO/issues/N)" -- present whenever
   this task was created from an issue). If one is present, include a closing

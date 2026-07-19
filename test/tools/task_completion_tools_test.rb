@@ -28,8 +28,62 @@ class TaskCompletionToolsTest < ActiveSupport::TestCase
     assert @task.blocked?
   end
 
-  test "MarkPrCompleteTool sets pr_agent_complete" do
-    MarkPrCompleteTool.new(task: @task).execute
+  test "MarkPrCompleteTool completes when there is genuinely nothing to submit" do
+    # Fresh repo: no commits ahead, clean worktree -> nothing to submit.
+    assert_match(/marked complete/, MarkPrCompleteTool.new(task: @task).execute)
+    assert @task.reload.pr_agent_complete
+  end
+
+  test "MarkPrCompleteTool refuses while the worktree has uncommitted changes" do
+    File.write(File.join(@repo_dir, "pending.txt"), "not committed")
+
+    tool = MarkPrCompleteTool.new(task: @task)
+    assert tool.dirty_worktree?, "expected the new untracked file to make the worktree dirty"
+    result = tool.execute
+
+    assert_match(/uncommitted changes/, result)
+    refute @task.reload.pr_agent_complete, "must not complete with uncommitted work"
+  end
+
+  test "MarkPrCompleteTool completes a committed branch when no remote is configured" do
+    tool = MarkPrCompleteTool.new(task: @task)
+    tool.stub(:dirty_worktree?, false) do
+      tool.stub(:commits_ahead?, true) do
+        tool.stub(:remote_configured?, false) do
+          assert_match(/marked complete/, tool.execute)
+        end
+      end
+    end
+    assert @task.reload.pr_agent_complete
+  end
+
+  test "MarkPrCompleteTool refuses a committed branch with a remote but no open PR" do
+    @task.update!(branch_name: "task/1-demo")
+    tool = MarkPrCompleteTool.new(task: @task)
+    tool.stub(:dirty_worktree?, false) do
+      tool.stub(:commits_ahead?, true) do
+        tool.stub(:remote_configured?, true) do
+          tool.stub(:open_pr?, false) do
+            assert_match(/no open PR/, tool.execute)
+          end
+        end
+      end
+    end
+    refute @task.reload.pr_agent_complete, "must not complete without an open PR when a remote exists"
+  end
+
+  test "MarkPrCompleteTool completes a committed branch once an open PR exists" do
+    @task.update!(branch_name: "task/1-demo")
+    tool = MarkPrCompleteTool.new(task: @task)
+    tool.stub(:dirty_worktree?, false) do
+      tool.stub(:commits_ahead?, true) do
+        tool.stub(:remote_configured?, true) do
+          tool.stub(:open_pr?, true) do
+            assert_match(/marked complete/, tool.execute)
+          end
+        end
+      end
+    end
     assert @task.reload.pr_agent_complete
   end
 end
