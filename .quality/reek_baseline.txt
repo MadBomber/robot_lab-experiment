@@ -1,7 +1,7 @@
 1	app/controllers/audit_tasks_controller.rb
 1	app/controllers/projects_controller.rb
 3	app/controllers/tasks_controller.rb
-3	app/jobs/agent_run_job.rb
+4	app/jobs/agent_run_job.rb
 1	app/services/agent_run_completion_handler.rb
 1	app/services/pr_status_service.rb
 2	app/services/transcript_recorder.rb

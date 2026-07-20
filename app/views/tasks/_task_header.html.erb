@@ -8,10 +8,10 @@
         &middot; runs: <%= task.workflow_run_count %>/<%= Task::MAX_WORKFLOW_RUNS %>
         <% if task.blocked? %>
           &middot; <span class="text-red-600 font-medium">blocked (<%= task.blocked_reason %>)</span>
-          <% if task.blocked_detail.present? %>
+          <% if task.blocked_detail? %>
             <div class="text-xs text-gray-600 mt-1">
               <span><%= task.blocked_detail %></span>
-              <% if task.blocked_run_id.present? %>
+              <% if task.blocked_run_id? %>
                 &middot; <%= link_to "run ##{task.blocked_run_id}", project_task_agent_run_path(task.project, task, AgentRun.find_by(id: task.blocked_run_id)), class: "text-blue-600 hover:underline" %>
               <% end %>
             </div>
