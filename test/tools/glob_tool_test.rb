@@ -27,4 +27,29 @@ class GlobToolTest < ActiveSupport::TestCase
   test "raises when path is not a directory" do
     assert_raises(RobotLab::ToolError) { @tool.execute(pattern: "*", path: "README.md") }
   end
+
+  test "does not return files outside cwd via a malicious glob pattern" do
+    outside = Dir.mktmpdir("glob_tool_outside")
+    begin
+      File.write(File.join(outside, "secret.txt"), "")
+      # Construct a pattern that reaches outside from within @dir.
+      pattern = File.join("..", File.basename(outside), "*.txt")
+      result = @tool.execute(pattern: pattern)
+      assert_empty result.split("\n").reject(&:empty?)
+    ensure
+      FileUtils.remove_entry(outside)
+    end
+  end
+
+  test "does not return files outside cwd through a symlink" do
+    outside = Dir.mktmpdir("glob_tool_outside")
+    begin
+      File.write(File.join(outside, "secret.txt"), "")
+      File.symlink(outside, File.join(@dir, "escape"))
+      result = @tool.execute(pattern: "escape/*.txt")
+      assert_empty result.split("\n").reject(&:empty?)
+    ensure
+      FileUtils.remove_entry(outside)
+    end
+  end
 end

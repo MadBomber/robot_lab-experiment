@@ -13,9 +13,9 @@ class GrepTool < CodingTool
     regexp = compile(pattern)
     matches = []
 
-    Dir.glob(File.join(base, glob)).each do |file|
-      next unless File.file?(file)
-
+    Dir.glob(File.join(base, glob)).select do |file|
+      File.file?(file) && read_scoped?(file)
+    end.each do |file|
       grep_file(file, regexp, matches)
       break if matches.size >= MAX_MATCHES
     end

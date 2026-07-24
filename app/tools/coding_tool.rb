@@ -67,7 +67,13 @@ class CodingTool < RobotLab::Tool
   # Resolve a path relative to +cwd+ and refuse anything that escapes it.
   # Used by *write* tools at *every* sandbox level -- no exceptions.
   def resolve_write_path(path)
-    resolve_confined(path)
+    full = File.expand_path(path.to_s, cwd)
+    real = realpath_of_deepest_existing(full)
+    unless confined_by_realpath?(real)
+      raise RobotLab::ToolError, "path escapes the working directory: #{path}"
+    end
+
+    full
   end
 
   # ------------------------------------------------------------------ read
@@ -82,13 +88,56 @@ class CodingTool < RobotLab::Tool
     end
   end
 
+  # Returns true when +full_path+ (which must be absolute) resolves to a real
+  # location within the read scope permitted by the current sandbox level.
+  def read_scoped?(full_path)
+    return true if sandbox_level == "none"
+
+    real = realpath_of_deepest_existing(full_path)
+    roots = case sandbox_level
+            when "loose" then [File.realpath(cwd)] + realpath_roots(read_roots)
+            when "root"  then [File.realpath(cwd)] + realpath_roots(read_roots) + realpath_roots(readable_roots)
+            else              [File.realpath(cwd)]
+            end
+    confined_by_realpath?(real, roots)
+  end
+
   # cwd is always allowed; otherwise the path must live under one of +extra_roots+
   # (empty for cwd-only confinement, which is every write and the tight read).
   def resolve_confined(path, extra_roots = [])
     full = File.expand_path(path.to_s, cwd)
-    return full if ([cwd] + extra_roots).any? { |root| full == root || full.start_with?("#{root}/") }
+    real = realpath_of_deepest_existing(full)
+    roots = [File.realpath(cwd)] + realpath_roots(extra_roots)
+    unless confined_by_realpath?(real, roots)
+      raise RobotLab::ToolError, "path escapes the working directory: #{path}"
+    end
 
-    raise RobotLab::ToolError, "path escapes the working directory: #{path}"
+    full
+  end
+
+  # Walks from +expanded_path+ toward the filesystem root and returns the
+  # File.realpath of the first ancestor that actually exists. If no ancestor
+  # exists, falls back to the cwd's realpath (which always exists in practice).
+  def realpath_of_deepest_existing(expanded_path)
+    Pathname.new(expanded_path).ascend do |pn|
+      return File.realpath(pn.to_s) if pn.exist?
+    end
+    File.realpath(cwd)
+  end
+
+  # Returns true when +real_path+ is equal to +root+ or contained beneath it.
+  # +extra_roots+ are normalized through File.realpath (non-existent roots are
+  # ignored) and +root+ is always the realpath of cwd.
+  def confined_by_realpath?(real_path, extra_roots = [])
+    ([File.realpath(cwd)] + realpath_roots(extra_roots)).any? do |root|
+      real_path == root || real_path.start_with?("#{root}/")
+    end
+  end
+
+  # Normalize a list of candidate roots via File.realpath, skipping any that do
+  # not exist on disk (a non-existent root cannot grant extra read access).
+  def realpath_roots(roots)
+    roots.map { |r| File.realpath(r) rescue nil }.compact.uniq
   end
 
   # Instance methods delegate to class-level memoized data.

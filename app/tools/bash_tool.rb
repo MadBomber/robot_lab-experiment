@@ -9,8 +9,10 @@ class BashTool < CodingTool
   DEFAULT_TIMEOUT = 120
 
   description "Run a shell command in the working directory and return its combined stdout+stderr. " \
-              "Note: sandbox levels only apply to Ruby-level file reads; shell commands are confined " \
-              "by chdir but can access the filesystem through the OS."
+              "This tool is outside the Ruby-level read sandbox: shell commands are confined by chdir " \
+              "to the working directory but can access the host filesystem, network, and secrets through " \
+              "the OS. Consequently, the 'none' read level does not materially expand what a determined " \
+              "caller can already reach via BashTool."
   param :command, type: "string", desc: "The shell command to run."
   param :timeout, type: "integer", desc: "Max seconds to allow (default #{DEFAULT_TIMEOUT}).", required: false
 
