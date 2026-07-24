@@ -94,10 +94,11 @@ class CodingTool < RobotLab::Tool
     return true if sandbox_level == "none"
 
     real = realpath_of_deepest_existing(full_path)
+    cwd_real = File.realpath(cwd)
     roots = case sandbox_level
-            when "loose" then [File.realpath(cwd)] + realpath_roots(read_roots)
-            when "root"  then [File.realpath(cwd)] + realpath_roots(read_roots) + realpath_roots(readable_roots)
-            else              [File.realpath(cwd)]
+            when "loose" then [cwd_real] + realpath_roots(read_roots)
+            when "root"  then [cwd_real] + realpath_roots(read_roots) + realpath_roots(readable_roots)
+            else              [cwd_real]
             end
     confined_by_realpath?(real, roots)
   end
@@ -119,10 +120,14 @@ class CodingTool < RobotLab::Tool
   # File.realpath of the first ancestor that actually exists. If no ancestor
   # exists, falls back to the cwd's realpath (which always exists in practice).
   def realpath_of_deepest_existing(expanded_path)
-    Pathname.new(expanded_path).ascend do |pn|
-      return File.realpath(pn.to_s) if pn.exist?
+    path = expanded_path
+    until File.exist?(path)
+      parent = File.dirname(path)
+      break if parent == path
+
+      path = parent
     end
-    File.realpath(cwd)
+    File.exist?(path) ? File.realpath(path) : File.realpath(cwd)
   end
 
   # Returns true when +real_path+ is equal to +root+ or contained beneath it.
