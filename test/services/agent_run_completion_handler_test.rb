@@ -110,7 +110,10 @@ class AgentRunCompletionHandlerTest < ActiveSupport::TestCase
 
     assert_equal :blocked_max_iterations, result.action
     assert_nil result.next_agent_run
-    assert_equal "max_iterations", task.reload.blocked_reason
+    task.reload
+    assert_equal "max_iterations", task.blocked_reason
+    assert_includes task.blocked_detail, "reached the 25-run workflow cap"
+    assert_equal run.id, task.blocked_run_id
   end
 
   test "workflow_complete is checked before the iteration cap, so a READY review still routes to PR" do
@@ -132,7 +135,10 @@ class AgentRunCompletionHandlerTest < ActiveSupport::TestCase
 
     assert_equal :blocked_no_progress, result.action
     assert_nil result.next_agent_run
-    assert_equal "no_progress", task.reload.blocked_reason
+    task.reload
+    assert_equal "no_progress", task.blocked_reason
+    assert_match /progress fingerprint unchanged/, task.blocked_detail
+    assert_equal run.id, task.blocked_run_id
   end
 
   test "a changing progress fingerprint resets the streak and keeps chaining" do

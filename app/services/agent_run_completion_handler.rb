@@ -30,7 +30,7 @@ class AgentRunCompletionHandler
 
     if @task.iteration_cap_reached?
       detail = "reached the #{Task::MAX_WORKFLOW_RUNS}-run workflow cap"
-      @task.update!(blocked_reason: "max_iterations", blocked_detail: detail)
+      @task.update!(blocked_reason: "max_iterations", blocked_detail: detail, blocked_run_id: @agent_run.id)
       return no_chain_with_broadcast(:blocked_max_iterations)
     end
 
@@ -56,7 +56,7 @@ class AgentRunCompletionHandler
     return unless @task.plateaued?
 
     detail = "progress fingerprint unchanged for #{@task.no_progress_streak} cycles"
-    @task.update!(blocked_reason: "no_progress", blocked_detail: detail)
+    @task.update!(blocked_reason: "no_progress", blocked_detail: detail, blocked_run_id: @agent_run.id)
     no_chain_with_broadcast(:blocked_no_progress)
   end
 

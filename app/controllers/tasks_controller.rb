@@ -53,21 +53,34 @@ class TasksController < ApplicationController
 
   # Stop auto-chaining but let the current run finish naturally.
   def pause
-    @task.update!(blocked_reason: "human_requested")
+    @task.update!(
+      blocked_reason: "human_requested",
+      blocked_detail: "paused by a human at #{Time.current.utc.iso8601}"
+    )
     redirect_to [@project, @task], notice: "Task paused -- it won't start another run."
   end
 
   # Halt the in-flight run now (cooperative cancel) and pause the pipeline.
   def stop
-    request_cancel(@task.running_agent_run)
-    @task.update!(blocked_reason: "human_requested")
+    run = @task.running_agent_run
+    request_cancel(run)
+    @task.update!(
+      blocked_reason: "human_requested",
+      blocked_detail: "stopped by a human at #{Time.current.utc.iso8601}",
+      blocked_run_id: run&.id
+    )
     redirect_to [@project, @task], notice: "Stopping the current run."
   end
 
   # Give up on the task: halt any in-flight run and mark it abandoned.
   def abandon
-    request_cancel(@task.running_agent_run)
-    @task.update!(blocked_reason: "abandoned")
+    run = @task.running_agent_run
+    request_cancel(run)
+    @task.update!(
+      blocked_reason: "abandoned",
+      blocked_detail: "abandoned by a human at #{Time.current.utc.iso8601}",
+      blocked_run_id: run&.id
+    )
     redirect_to [@project, @task], notice: "Task abandoned."
   end
 

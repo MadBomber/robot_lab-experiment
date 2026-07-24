@@ -11,7 +11,7 @@ Rails.application.routes.draw do
 
   resources :projects, only: %i[index new create show edit update destroy] do
     resources :tasks, only: %i[new create show destroy] do
-      resources :agent_runs, only: [:create]
+      resources :agent_runs, only: %i[create show]
       post :unblock, on: :member
       post :pause, on: :member
       post :stop, on: :member
