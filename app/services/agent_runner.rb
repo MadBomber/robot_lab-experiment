@@ -7,10 +7,10 @@
 class AgentRunner
   class AlreadyRunningError < StandardError; end
 
-  # Local Ollama server, no API key required. See config/robot_lab.yml for the
-  # ollama_api_base default (overridable via ROBOT_LAB_RUBY_LLM__OLLAMA_API_BASE).
-  DEFAULT_PROVIDER = "ollama".freeze
-  DEFAULT_MODEL = "qwen3.6:latest".freeze
+  # OpenRouter-hosted model. Requires OPENROUTER_API_KEY -- see
+  # config/initializers/ruby_llm.rb.
+  DEFAULT_PROVIDER = "openrouter".freeze
+  DEFAULT_MODEL = "moonshotai/kimi-k2.7-code".freeze
 
   def self.start_agent_run(task, agent_type, provider: DEFAULT_PROVIDER, model: DEFAULT_MODEL)
     new(task).start_agent_run(agent_type, provider:, model:)

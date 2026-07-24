@@ -18,8 +18,8 @@ class AgentRunnerTest < ActiveSupport::TestCase
 
       assert run.running?
       assert_equal "planning", run.agent_type
-      assert_equal "ollama", run.conversation.provider
-      assert_equal "qwen3.6:latest", run.conversation.model
+      assert_equal "openrouter", run.conversation.provider
+      assert_equal "moonshotai/kimi-k2.7-code", run.conversation.model
     end
   end
 
