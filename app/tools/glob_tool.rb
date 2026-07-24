@@ -7,7 +7,7 @@ class GlobTool < CodingTool
     base = resolve_read_path(path)
     raise RobotLab::ToolError, "no such directory: #{path}" unless File.directory?(base)
 
-    matches = Dir.glob(File.join(base, pattern))
+    matches = Dir.glob(File.join(base, pattern)).select { |m| read_scoped?(m) }
     matches.map { |m| m.delete_prefix("#{cwd}/") }.join("\n")
   end
 end

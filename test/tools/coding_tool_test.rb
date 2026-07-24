@@ -142,6 +142,71 @@ class CodingToolTest < ActiveSupport::TestCase
     assert_match(/escapes the working directory/, error.message)
   end
 
+  # -- symlink confinement --
+
+  test "symlink write escape is rejected at all levels" do
+    outside = Dir.mktmpdir("coding_tool_outside")
+    begin
+      File.symlink(outside, File.join(@dir, "escape"))
+
+      %w[tight loose root none].each do |level|
+        tool = WriteFileTool.new(cwd: @dir, sandbox_level: level)
+        error = assert_raises(RobotLab::ToolError, "level #{level} should reject symlink escape") do
+          tool.execute(path: "escape/pwned.txt", content: "x")
+        end
+        assert_match(/escapes the working directory/, error.message)
+        refute File.exist?(File.join(outside, "pwned.txt")), "level #{level} leaked a write"
+      end
+    ensure
+      FileUtils.remove_entry(outside)
+    end
+  end
+
+  test "symlink read escape is rejected at tight level" do
+    outside = Dir.mktmpdir("coding_tool_outside")
+    begin
+      File.write(File.join(outside, "secret.txt"), "secret")
+      File.symlink(outside, File.join(@dir, "escape"))
+
+      tool = ReadFileTool.new(cwd: @dir, sandbox_level: "tight")
+      error = assert_raises(RobotLab::ToolError) { tool.execute(path: "escape/secret.txt") }
+      assert_match(/escapes the working directory/, error.message)
+    ensure
+      FileUtils.remove_entry(outside)
+    end
+  end
+
+  test "symlink read escape is allowed at loose or root only when target is inside allowed roots" do
+    outside = Dir.mktmpdir("coding_tool_outside")
+    begin
+      File.write(File.join(outside, "secret.txt"), "secret")
+      File.symlink(outside, File.join(@dir, "escape_outside"))
+
+      allowed_inside = File.join(@dir, "allowed")
+      FileUtils.mkdir_p(allowed_inside)
+      File.write(File.join(allowed_inside, "ok.txt"), "ok")
+      File.symlink(allowed_inside, File.join(@dir, "escape_inside"))
+
+      # Outside target is rejected at loose.
+      loose_tool = ReadFileTool.new(cwd: @dir, sandbox_level: "loose")
+      error = assert_raises(RobotLab::ToolError) { loose_tool.execute(path: "escape_outside/secret.txt") }
+      assert_match(/escapes the working directory/, error.message)
+
+      # Inside target is accepted at loose.
+      assert_equal "ok", loose_tool.execute(path: "escape_inside/ok.txt")
+
+      # Outside target is rejected at root.
+      root_tool = ReadFileTool.new(cwd: @dir, sandbox_level: "root")
+      error = assert_raises(RobotLab::ToolError) { root_tool.execute(path: "escape_outside/secret.txt") }
+      assert_match(/escapes the working directory/, error.message)
+
+      # Inside target is accepted at root.
+      assert_equal "ok", root_tool.execute(path: "escape_inside/ok.txt")
+    ensure
+      FileUtils.remove_entry(outside)
+    end
+  end
+
   # -- env var fallback --
 
   test "effective_sandbox_level from AGENT_SANDBOX_LEVEL" do

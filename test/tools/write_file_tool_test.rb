@@ -24,4 +24,15 @@ class WriteFileToolTest < ActiveSupport::TestCase
   test "raises when the path escapes cwd" do
     assert_raises(RobotLab::ToolError) { @tool.execute(path: "../outside.txt", content: "x") }
   end
+
+  test "raises when the path escapes cwd through a symlink" do
+    outside = Dir.mktmpdir("write_file_tool_outside")
+    begin
+      File.symlink(outside, File.join(@dir, "escape"))
+      assert_raises(RobotLab::ToolError) { @tool.execute(path: "escape/pwned.txt", content: "x") }
+      refute File.exist?(File.join(outside, "pwned.txt"))
+    ensure
+      FileUtils.remove_entry(outside)
+    end
+  end
 end

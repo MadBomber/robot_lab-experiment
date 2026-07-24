@@ -30,4 +30,28 @@ class GrepToolTest < ActiveSupport::TestCase
     error = assert_raises(RobotLab::ToolError) { @tool.execute(pattern: "(unclosed") }
     assert_match "invalid pattern", error.message
   end
+
+  test "does not search files outside cwd via a malicious glob pattern" do
+    outside = Dir.mktmpdir("grep_tool_outside")
+    begin
+      File.write(File.join(outside, "secret.rb"), "class SuperSecret\nend\n")
+      pattern = File.join("..", File.basename(outside), "*.rb")
+      result = @tool.execute(pattern: "SuperSecret", glob: pattern)
+      assert_equal "No matches", result
+    ensure
+      FileUtils.remove_entry(outside)
+    end
+  end
+
+  test "does not search files outside cwd through a symlink" do
+    outside = Dir.mktmpdir("grep_tool_outside")
+    begin
+      File.write(File.join(outside, "secret.rb"), "class SuperSecret\nend\n")
+      File.symlink(outside, File.join(@dir, "escape"))
+      result = @tool.execute(pattern: "SuperSecret", glob: "escape/*.rb")
+      assert_equal "No matches", result
+    ensure
+      FileUtils.remove_entry(outside)
+    end
+  end
 end
