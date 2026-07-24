@@ -99,11 +99,29 @@ class TasksControllerTest < ActionDispatch::IntegrationTest
     assert_select "turbo-cable-stream-source", count: 1
   end
 
+  test "show renders blocked detail and a link to the blocking run transcript" do
+    task = Task.create!(project: @project, title: "Stuck", blocked_reason: "no_progress",
+                        blocked_detail: "No progress: repeated the same tool call 4 times during run #1 (implementation)",
+                        blocked_run_id: 1)
+    conversation = Conversation.create!(task:, provider: "ollama", model: "qwen3.6:latest", started_at: Time.current)
+    AgentRun.create!(id: 1, task:, conversation:, agent_type: "implementation", status: "blocked")
+
+    get project_task_url(@project, task)
+
+    assert_response :success
+    assert_select ".text-red-600", text: /blocked \(no_progress\)/
+    assert_select ".text-xs.text-gray-600", text: /No progress: repeated the same tool call 4 times/
+    assert_select "a[href=?]", project_task_agent_run_path(@project, task, 1), text: "run #1"
+  end
+
   test "unblock clears blocked_reason and redirects back to the task" do
-    task = Task.create!(project: @project, title: "Add login", blocked_reason: "human_requested")
+    task = Task.create!(project: @project, title: "Add login", blocked_reason: "human_requested",
+                        blocked_detail: "paused by a human", blocked_run_id: 123)
     post unblock_project_task_url(@project, task)
     assert_redirected_to project_task_url(@project, task)
     assert_not task.reload.blocked?
+    assert_nil task.blocked_detail
+    assert_nil task.blocked_run_id
   end
 
   test "update_status manually overrides the task's status" do
@@ -169,6 +187,8 @@ class TasksControllerTest < ActionDispatch::IntegrationTest
     post pause_project_task_url(@project, task)
     assert_redirected_to project_task_url(@project, task)
     assert_equal "human_requested", task.reload.blocked_reason
+    assert_match(/paused by a human at/, task.blocked_detail)
+    assert_nil task.blocked_run_id
     assert_not run.reload.cancel_requested?
   end
 
@@ -177,14 +197,20 @@ class TasksControllerTest < ActionDispatch::IntegrationTest
     post stop_project_task_url(@project, task)
     assert_redirected_to project_task_url(@project, task)
     assert run.reload.cancel_requested?
-    assert_equal "human_requested", task.reload.blocked_reason
+    task.reload
+    assert_equal "human_requested", task.blocked_reason
+    assert_match(/stopped by a human at/, task.blocked_detail)
+    assert_equal run.id, task.blocked_run_id
   end
 
   test "abandon cancels the running run and marks the task abandoned" do
     task, run = running_task
     post abandon_project_task_url(@project, task)
     assert run.reload.cancel_requested?
-    assert_equal "abandoned", task.reload.blocked_reason
+    task.reload
+    assert_equal "abandoned", task.blocked_reason
+    assert_match(/abandoned by a human at/, task.blocked_detail)
+    assert_equal run.id, task.blocked_run_id
   end
 
   test "stop is safe when no run is in flight" do
