@@ -187,7 +187,7 @@ class TasksControllerTest < ActionDispatch::IntegrationTest
     post pause_project_task_url(@project, task)
     assert_redirected_to project_task_url(@project, task)
     assert_equal "human_requested", task.reload.blocked_reason
-    assert_match /paused by a human at/, task.blocked_detail
+    assert_match(/paused by a human at/, task.blocked_detail)
     assert_nil task.blocked_run_id
     assert_not run.reload.cancel_requested?
   end
@@ -199,7 +199,7 @@ class TasksControllerTest < ActionDispatch::IntegrationTest
     assert run.reload.cancel_requested?
     task.reload
     assert_equal "human_requested", task.blocked_reason
-    assert_match /stopped by a human at/, task.blocked_detail
+    assert_match(/stopped by a human at/, task.blocked_detail)
     assert_equal run.id, task.blocked_run_id
   end
 
@@ -209,7 +209,7 @@ class TasksControllerTest < ActionDispatch::IntegrationTest
     assert run.reload.cancel_requested?
     task.reload
     assert_equal "abandoned", task.blocked_reason
-    assert_match /abandoned by a human at/, task.blocked_detail
+    assert_match(/abandoned by a human at/, task.blocked_detail)
     assert_equal run.id, task.blocked_run_id
   end
 

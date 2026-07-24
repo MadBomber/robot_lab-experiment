@@ -58,13 +58,19 @@ class AgentRunJob < ApplicationJob
   # burning more runs; a human can inspect, guide, and unblock (see #22/#23).
   def plateaued(agent_run, task, error)
     agent_run.update!(status: "blocked")
-    reason = error.respond_to?(:reason) ? error.reason : error.message
     task.update!(
       blocked_reason: "no_progress",
-      blocked_detail: "No progress: #{reason} during run ##{agent_run.id} (#{agent_run.agent_type})",
+      blocked_detail: "No progress: #{plateau_reason(error)} during run ##{agent_run.id} (#{agent_run.agent_type})",
       blocked_run_id: agent_run.id
     )
     Rails.logger.warn("#{tag(agent_run)} plateaued: #{error.message}")
+  end
+
+  # PlateauMonitor::Plateaued#reason is the clean, prefix-free message; any
+  # other error class (e.g. robot_lab's own circuit breaker) falls back to
+  # #message, which every StandardError has.
+  def plateau_reason(error)
+    error.try(:reason) || error.message
   end
 
   def failed(agent_run, error)

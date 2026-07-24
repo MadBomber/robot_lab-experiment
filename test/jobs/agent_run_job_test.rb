@@ -87,7 +87,7 @@ class AgentRunJobTest < ActiveSupport::TestCase
 
     assert_equal "blocked", @agent_run.reload.status
     assert_equal "no_progress", @task.reload.blocked_reason
-    assert_match /No progress:/, @task.blocked_detail
+    assert_match(/No progress:/, @task.blocked_detail)
     assert_includes @task.blocked_detail, "run ##{@agent_run.id}"
     assert_includes @task.blocked_detail, "(implementation)"
     assert_equal @agent_run.id, @task.blocked_run_id

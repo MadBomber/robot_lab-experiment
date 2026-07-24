@@ -137,7 +137,7 @@ class AgentRunCompletionHandlerTest < ActiveSupport::TestCase
     assert_nil result.next_agent_run
     task.reload
     assert_equal "no_progress", task.blocked_reason
-    assert_match /progress fingerprint unchanged/, task.blocked_detail
+    assert_match(/progress fingerprint unchanged/, task.blocked_detail)
     assert_equal run.id, task.blocked_run_id
   end
 
