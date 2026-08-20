@@ -4,3 +4,8 @@
 require_relative "config/application"
 
 Rails.application.load_tasks
+
+desc "No-op — this is a Rails app, not a gem, so there's nothing to install"
+task :install do
+  # intentionally empty
+end
