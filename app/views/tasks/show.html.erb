@@ -6,9 +6,7 @@
   <%= render "task_header", task: @task, project: @project %>
 
   <div class="tp-layout">
-    <aside class="tp-sidebar">
-      <%= render "task_controls", task: @task, project: @project, doc_content: @doc_content %>
-    </aside>
+    <%= render "task_controls", task: @task, project: @project, doc_content: @doc_content %>
 
     <main class="min-w-0">
       <div class="tp-toolbar">

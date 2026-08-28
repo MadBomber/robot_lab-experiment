@@ -84,14 +84,27 @@ class AgentRunCompletionHandler
     no_chain(action)
   end
 
+  # Both the stepper/status pill (task-header) and the sidebar's action
+  # buttons (task-sidebar, e.g. "Run implementation" appearing once planning
+  # stops for review) depend on the same Task state -- refresh both together
+  # whenever it changes, so nobody has to reload the page to see them.
   def broadcast_task_header(action, next_agent_run)
     return unless defined?(Turbo::StreamsChannel)
 
+    stream = "task_#{@task.id}"
+
     Turbo::StreamsChannel.broadcast_replace_to(
-      "task_#{@task.id}",
+      stream,
       target: "task-header",
       partial: "tasks/task_header",
       locals: { task: @task, project: @task.project }
+    )
+
+    Turbo::StreamsChannel.broadcast_replace_to(
+      stream,
+      target: "task-sidebar",
+      partial: "tasks/task_controls",
+      locals: { task: @task, project: @task.project, doc_content: TaskDocument.read(@task) }
     )
   end
 end

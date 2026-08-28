@@ -40,8 +40,8 @@ class SolidCacheConfigTest < ActiveSupport::TestCase
     prod_config = Rails.root.join("config/environments/production.rb").read
 
     assert_match(/config\.cache_store\s*=\s*:solid_cache_store/, dev_config,
-      "development.rb should set config.cache_store to :solid_cache_store")
+                 "development.rb should set config.cache_store to :solid_cache_store")
     assert_match(/config\.cache_store\s*=\s*:solid_cache_store/, prod_config,
-      "production.rb should set config.cache_store to :solid_cache_store")
+                 "production.rb should set config.cache_store to :solid_cache_store")
   end
 end

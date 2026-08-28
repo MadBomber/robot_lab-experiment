@@ -22,6 +22,19 @@ class AgentRunCompletionHandlerTest < ActiveSupport::TestCase
     assert_equal 0, task.agent_runs.where.not(id: run.id).count
   end
 
+  test "planning stopping broadcasts a refresh of both the header and the sidebar" do
+    task = build_task(planning_complete: true)
+    run = finished_run(task, "planning")
+    targets = []
+
+    Turbo::StreamsChannel.stub(:broadcast_replace_to, ->(_stream, target:, **) { targets << target }) do
+      AgentRunCompletionHandler.call(run)
+    end
+
+    assert_includes targets, "task-header"
+    assert_includes targets, "task-sidebar"
+  end
+
   test "planning finishing with planning_complete set moves task status to in_review" do
     task = build_task(planning_complete: true)
     run = finished_run(task, "planning")
