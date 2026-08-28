@@ -10,6 +10,7 @@ Rails.application.routes.draw do
   # get "service-worker" => "rails/pwa#service_worker", as: :pwa_service_worker
 
   resources :projects, only: %i[index new create show edit update destroy] do
+    patch :update_llm, on: :member
     resources :tasks, only: %i[new create show destroy] do
       resources :agent_runs, only: %i[create show]
       post :unblock, on: :member

@@ -1,6 +1,7 @@
 class ProjectsController < ApplicationController
   def index
     @projects = Project.order(:name)
+    @llm_options = Project.llm_options
   end
 
   def new
@@ -54,9 +55,28 @@ class ProjectsController < ApplicationController
     end
   end
 
+  # Sets which LLM provider/model new agent runs for this project use --
+  # a narrower sibling of #update so the index page's inline picker can save
+  # without leaving the index (see AgentRunner#effective_provider/#effective_model
+  # for the fallback to AgentRunner::DEFAULT_PROVIDER/DEFAULT_MODEL).
+  def update_llm
+    @project = Project.find(params[:id])
+
+    if @project.update(llm_params)
+      redirect_to projects_path, notice: "LLM settings updated for #{@project.name}."
+    else
+      redirect_to projects_path, alert: @project.errors.full_messages.to_sentence
+    end
+  end
+
   private
 
   def project_params
     params.expect(project: %i[name repo_folder_path subproject_path])
+  end
+
+  def llm_params
+    permitted = params.expect(project: %i[llm_provider llm_model])
+    { llm_provider: permitted[:llm_provider].presence, llm_model: permitted[:llm_model].presence }
   end
 end

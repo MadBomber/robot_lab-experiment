@@ -46,7 +46,7 @@
 <% end %>
 
 <div class="tp-panel">
-  <details class="tp-details">
+  <details class="tp-details" <%= "open" if doc_content.present? %>>
     <summary>Task doc</summary>
     <pre class="tp-doc"><%= doc_content.presence || "(empty)" %></pre>
   </details>

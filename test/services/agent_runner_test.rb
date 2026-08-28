@@ -54,4 +54,18 @@ class AgentRunnerTest < ActiveSupport::TestCase
     assert_equal "openai", run.conversation.provider
     assert_equal "gpt-5", run.conversation.model
   end
+
+  test "falls back to the project's llm_provider/llm_model when no explicit override is given" do
+    @task.project.update!(llm_provider: "ollama", llm_model: "qwen3.6:latest")
+    run = AgentRunner.start_agent_run(@task, :planning)
+    assert_equal "ollama", run.conversation.provider
+    assert_equal "qwen3.6:latest", run.conversation.model
+  end
+
+  test "an explicit override still wins over the project's llm_provider/llm_model" do
+    @task.project.update!(llm_provider: "ollama", llm_model: "qwen3.6:latest")
+    run = AgentRunner.start_agent_run(@task, :planning, provider: "openai", model: "gpt-5")
+    assert_equal "openai", run.conversation.provider
+    assert_equal "gpt-5", run.conversation.model
+  end
 end

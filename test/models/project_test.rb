@@ -48,4 +48,47 @@ class ProjectTest < ActiveSupport::TestCase
     project = Project.new(repo_folder_path: @repo_dir, subproject_path: "packages/app")
     assert_equal File.join(@repo_dir, "packages/app"), project.effective_cwd
   end
+
+  test "llm_provider and llm_model are both optional together" do
+    project = Project.new(name: "Demo", repo_folder_path: @repo_dir)
+    assert project.valid?
+  end
+
+  test "llm_model is required once llm_provider is set" do
+    project = Project.new(name: "Demo", repo_folder_path: @repo_dir, llm_provider: "ollama")
+    assert_not project.valid?
+    assert_includes project.errors[:llm_model], "can't be blank"
+  end
+
+  test "llm_provider is required once llm_model is set" do
+    project = Project.new(name: "Demo", repo_folder_path: @repo_dir, llm_model: "qwen3.6:latest")
+    assert_not project.valid?
+    assert_includes project.errors[:llm_provider], "can't be blank"
+  end
+
+  test "llm_options includes real openrouter models from RubyLLM's bundled registry" do
+    options = Project.llm_options
+    openrouter = options.select { |o| o[:provider] == "openrouter" }
+
+    assert_not_empty openrouter
+    assert(openrouter.all? { |o| o[:model].present? && o[:label].present? })
+  end
+
+  test "llm_options includes ollama models found by a live query against the local server" do
+    fake_model = RubyLLM::Model::Info.new(id: "qwen3.6:latest", name: "qwen3.6:latest", provider: "ollama")
+    fake_provider = Minitest::Mock.new
+    fake_provider.expect(:list_models, [fake_model])
+
+    RubyLLM::Providers::Ollama.stub(:new, fake_provider) do
+      options = Project.llm_options
+      assert_includes options, { provider: "ollama", model: "qwen3.6:latest", label: fake_model.label }
+    end
+  end
+
+  test "llm_options omits ollama entries rather than raising when the local server is unreachable" do
+    RubyLLM::Providers::Ollama.stub(:new, ->(*) { raise Faraday::ConnectionFailed, "connection refused" }) do
+      options = Project.llm_options
+      assert(options.none? { |o| o[:provider] == "ollama" })
+    end
+  end
 end

@@ -12,6 +12,8 @@ class Task < ApplicationRecord
   has_many :conversations, dependent: :destroy
   has_many :agent_runs, dependent: :delete_all
 
+  delegate :llm_provider, :llm_model, to: :project
+
   # Not persisted -- only carries the New Task form's description through to
   # TaskDocument.seed (and back to the form on a validation-error re-render).
   attr_accessor :description

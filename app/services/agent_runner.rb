@@ -7,12 +7,13 @@
 class AgentRunner
   class AlreadyRunningError < StandardError; end
 
-  # OpenRouter-hosted model. Requires OPENROUTER_API_KEY -- see
-  # config/initializers/ruby_llm.rb.
+  # Fallback when the task's project has no llm_provider/llm_model of its own
+  # (see Project.llm_options). OpenRouter-hosted model; requires
+  # OPENROUTER_API_KEY -- see config/initializers/ruby_llm.rb.
   DEFAULT_PROVIDER = "openrouter".freeze
   DEFAULT_MODEL = "moonshotai/kimi-k2.7-code".freeze
 
-  def self.start_agent_run(task, agent_type, provider: DEFAULT_PROVIDER, model: DEFAULT_MODEL)
+  def self.start_agent_run(task, agent_type, provider: nil, model: nil)
     new(task).start_agent_run(agent_type, provider:, model:)
   end
 
@@ -20,13 +21,13 @@ class AgentRunner
     @task = task
   end
 
-  def start_agent_run(agent_type, provider: DEFAULT_PROVIDER, model: DEFAULT_MODEL)
+  def start_agent_run(agent_type, provider: nil, model: nil)
     raise AlreadyRunningError, "task #{@task.id} already has a running agent" if @task.running_agent_run
 
     @task.increment!(:workflow_run_count)
 
     conversation = Conversation.create!(
-      task: @task, provider:, model:, started_at: Time.current
+      task: @task, provider: provider || effective_provider, model: model || effective_model, started_at: Time.current
     )
     agent_run = AgentRun.create!(
       task: @task, conversation:, agent_type: agent_type.to_s, status: "running"
@@ -35,5 +36,15 @@ class AgentRunner
 
     AgentRunJob.perform_later(agent_run.id)
     agent_run
+  end
+
+  private
+
+  def effective_provider
+    @task.llm_provider.presence || DEFAULT_PROVIDER
+  end
+
+  def effective_model
+    @task.llm_model.presence || DEFAULT_MODEL
   end
 end

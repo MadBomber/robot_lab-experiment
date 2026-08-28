@@ -29,9 +29,17 @@ class WorktreeService
 
     _out, err, status = run("git", "worktree", "remove", "--force", @task.worktree_path, chdir: @project.repo_folder_path)
     # git errors if the worktree is already gone -- that's a no-op success for us.
-    # But a real failure that leaves the directory behind (permissions, locked
-    # files, corrupt state) must surface, not be swallowed into a false success.
-    raise Error, "git worktree remove failed: #{err.strip}" if !status.success? && Dir.exist?(@task.worktree_path)
+    if !status.success? && Dir.exist?(@task.worktree_path)
+      # A real failure that leaves the directory behind (permissions, locked
+      # files, corrupt state) must surface, not be swallowed into a false success.
+      raise Error, "git worktree remove failed: #{err.strip}" unless err.include?("is not a working tree")
+
+      # git has no administrative record of this as a worktree at all (e.g.
+      # pruned separately, or the .git/worktrees/<name> entry is otherwise
+      # gone) -- there's nothing left for git to manage, so remove the
+      # orphaned directory ourselves rather than leaving it stuck forever.
+      FileUtils.rm_rf(@task.worktree_path)
+    end
 
     # Branch deletion stays best-effort: a missing branch (already deleted, or
     # never created) is a normal, benign state and must not block teardown.

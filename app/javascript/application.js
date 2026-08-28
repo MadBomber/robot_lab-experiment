@@ -36,6 +36,31 @@ document.addEventListener('turbo:load', () => {
   }
 });
 
+document.addEventListener('turbo:load', () => {
+  const dataEl = document.getElementById('tp-llm-options');
+  if (!dataEl) return;
+
+  const optionsByProvider = JSON.parse(dataEl.dataset.options);
+
+  document.querySelectorAll('.tp-llm-provider').forEach((providerSelect) => {
+    providerSelect.addEventListener('change', () => {
+      const modelSelect = providerSelect.closest('form').querySelector('.tp-llm-model');
+      const models = optionsByProvider[providerSelect.value] || [];
+
+      modelSelect.innerHTML = '';
+
+      if (!providerSelect.value) {
+        modelSelect.disabled = true;
+        modelSelect.appendChild(new Option('App default', ''));
+        return;
+      }
+
+      modelSelect.disabled = false;
+      models.forEach((m) => modelSelect.appendChild(new Option(m.label, m.value)));
+    });
+  });
+});
+
 (function startHeartbeatPolling() {
   const statusEl = document.getElementById('agent-status');
   if (!statusEl) return;

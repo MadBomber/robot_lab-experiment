@@ -1,17 +1,56 @@
 <div class="w-full max-w-2xl">
   <h1 class="text-2xl font-bold mb-4">Projects</h1>
 
-  <ul class="divide-y divide-gray-200 mb-6">
+  <ul class="divide-y divide-gray-200 mb-6"
+    id="tp-llm-options"
+    data-options="<%= @llm_options.group_by { |o| o[:provider] }
+      .transform_values { |opts| opts.map { |o| { value: o[:model], label: o[:label] } } }.to_json %>">
     <% @projects.each do |project| %>
-      <li class="py-3 flex items-center justify-between">
-        <%= link_to project.name, project, class: "text-blue-600 hover:underline" %>
-        <span class="text-gray-500 text-sm mr-4"><%= project.repo_folder_path %></span>
-        <div class="flex gap-2">
-          <%= link_to "Edit", edit_project_path(project), class: "text-blue-600 hover:underline text-sm" %>
-          <%= button_to "Delete", project_path(project), method: :delete,
-                data: { turbo_confirm: "Delete this project and all associated tasks/worktrees?" },
-                class: "text-red-600 hover:underline text-sm", form_class: "inline" %>
+      <li class="py-3">
+        <div class="flex items-center justify-between">
+          <%= link_to project.name, project, class: "text-blue-600 hover:underline" %>
+          <span class="text-gray-500 text-sm mr-4"><%= project.repo_folder_path %></span>
+          <div class="flex gap-2">
+            <%= link_to "Edit", edit_project_path(project), class: "text-blue-600 hover:underline text-sm" %>
+            <%= button_to "Delete", project_path(project), method: :delete,
+                  data: { turbo_confirm: "Delete this project and all associated tasks/worktrees?" },
+                  class: "text-red-600 hover:underline text-sm", form_class: "inline" %>
+          </div>
         </div>
+        <%= form_with url: update_llm_project_path(project), method: :patch,
+              class: "mt-1 flex items-center gap-1" do %>
+          <span class="text-xs text-gray-500">LLM:</span>
+
+          <select name="project[llm_provider]" class="tp-llm-provider text-xs border rounded">
+            <option value="" <%= "selected" if !project.llm_provider? %>>App default</option>
+            <% unless current_llm_provider_listed?(project, @llm_options) %>
+              <option value="<%= project.llm_provider %>" selected>
+                <%= project.llm_provider %> (currently set, not in the live list)
+              </option>
+            <% end %>
+            <% @llm_options.map { |o| o[:provider] }.uniq.each do |provider| %>
+              <option value="<%= provider %>" <%= "selected" if project.llm_provider == provider %>><%= provider %></option>
+            <% end %>
+          </select>
+
+          <select name="project[llm_model]" class="tp-llm-model text-xs border rounded"
+            <%= "disabled" if !project.llm_provider? %>>
+            <% if !project.llm_provider? %>
+              <option value="">App default (<%= AgentRunner::DEFAULT_PROVIDER %>/<%= AgentRunner::DEFAULT_MODEL %>)</option>
+            <% else %>
+              <% unless current_llm_pair_listed?(project, @llm_options) %>
+                <option value="<%= project.llm_model %>" selected>
+                  <%= project.llm_model %> (currently set, not in the live list)
+                </option>
+              <% end %>
+              <% llm_options_for_provider(project, @llm_options).each do |opt| %>
+                <option value="<%= opt[:model] %>" <%= "selected" if project.llm_model == opt[:model] %>><%= opt[:label] %></option>
+              <% end %>
+            <% end %>
+          </select>
+
+          <%= submit_tag "Set", class: "text-xs bg-gray-200 hover:bg-gray-300 px-2 py-1 rounded cursor-pointer" %>
+        <% end %>
       </li>
     <% end %>
   </ul>

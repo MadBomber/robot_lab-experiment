@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_28_205946) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_28_221901) do
   create_table "agent_runs", force: :cascade do |t|
     t.string "agent_type", null: false
     t.boolean "cancel_requested", default: false, null: false
@@ -48,6 +48,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_28_205946) do
 
   create_table "projects", force: :cascade do |t|
     t.datetime "created_at", null: false
+    t.string "llm_model"
+    t.string "llm_provider"
     t.string "name", null: false
     t.string "repo_folder_path", null: false
     t.string "subproject_path"

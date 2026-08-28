@@ -65,6 +65,21 @@ class WorktreeServiceTest < ActiveSupport::TestCase
     assert Dir.exist?(path), "the still-present worktree should not be reported as removed"
   end
 
+  test "remove falls back to a plain delete when git no longer recognizes an on-disk worktree" do
+    service = WorktreeService.new(@task)
+    path = service.create
+
+    # Simulate a worktree whose .git/worktrees/<name> admin entry is gone
+    # (e.g. pruned separately) while the directory itself is still present --
+    # git refuses to touch it, so we must clean it up ourselves.
+    failure = ["", "fatal: '#{path}' is not a working tree", Struct.new(:success?).new(false)]
+    Open3.stub(:capture3, ->(*_args, **_kwargs) { failure }) do
+      assert_nothing_raised { service.remove }
+    end
+
+    assert_not Dir.exist?(path)
+  end
+
   test "remove tolerates git errors when the worktree directory is already gone" do
     service = WorktreeService.new(@task)
     path = service.create
