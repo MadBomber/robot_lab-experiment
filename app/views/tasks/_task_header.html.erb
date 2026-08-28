@@ -20,8 +20,9 @@
   <% if task.blocked? && task.blocked_detail? %>
     <div class="tp-blocked-detail">
       <span><%= task.blocked_detail %></span>
-      <% if task.blocked_run_id? %>
-        &middot; <%= link_to "run ##{task.blocked_run_id}", project_task_agent_run_path(task.project, task, AgentRun.find_by(id: task.blocked_run_id)) %>
+      <% blocked_run = task.blocked_run_id? ? AgentRun.find_by(id: task.blocked_run_id) : nil %>
+      <% if blocked_run %>
+        &middot; <%= link_to "run ##{blocked_run.id}", project_task_agent_run_path(task.project, task, blocked_run) %>
       <% end %>
     </div>
   <% end %>
