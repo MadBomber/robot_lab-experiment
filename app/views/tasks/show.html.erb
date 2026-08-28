@@ -1,10 +1,30 @@
-<%= render "task_header", task: @task, project: @project %>
+<% content_for(:head) do %>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<% end %>
 
-<h2 class="text-lg font-semibold mb-2">Task doc</h2>
-<pre class="bg-gray-50 border rounded p-4 mb-6 whitespace-pre-wrap"><%= @doc_content.presence || "(empty)" %></pre>
+<div class="tp-page">
+  <%= render "task_header", task: @task, project: @project %>
 
-<h2 class="text-lg font-semibold mb-2">Transcript</h2>
-<%= turbo_stream_from "task_#{@task.id}" %>
-<div id="transcript" class="border rounded p-4 space-y-2 max-h-96 overflow-y-auto">
-  <%= render partial: "messages/message", collection: @messages, as: :message %>
+  <div class="tp-layout">
+    <aside class="tp-sidebar">
+      <%= render "task_controls", task: @task, project: @project, doc_content: @doc_content %>
+    </aside>
+
+    <main class="min-w-0">
+      <div class="tp-toolbar">
+        <span class="tp-eyebrow">Transcript</span>
+        <label class="tp-check">
+          <input type="checkbox" id="tp-collapse-toggle">
+          Collapse tool calls
+        </label>
+      </div>
+
+      <%= turbo_stream_from "task_#{@task.id}" %>
+      <div id="transcript" class="tp-transcript">
+        <%= render partial: "messages/message", collection: @messages, as: :message %>
+      </div>
+
+      <%= render "tasks/agent_status", running: @task.running_agent_run.present?, task: @task %>
+    </main>
+  </div>
 </div>

@@ -9,3 +9,13 @@ desc "No-op — this is a Rails app, not a gem, so there's nothing to install"
 task :install do
   # intentionally empty
 end
+
+desc "No-op — this is a Rails app, not a gem, so there's nothing to build"
+task :build do
+  # intentionally empty
+end
+
+desc "No-op — this is a Rails app, not a gem, so there's nothing to release"
+task :release do
+  # intentionally empty
+end

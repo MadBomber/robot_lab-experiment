@@ -109,8 +109,8 @@ class TasksControllerTest < ActionDispatch::IntegrationTest
     get project_task_url(@project, task)
 
     assert_response :success
-    assert_select ".text-red-600", text: /blocked \(no_progress\)/
-    assert_select ".text-xs.text-gray-600", text: /No progress: repeated the same tool call 4 times/
+    assert_select ".tp-pill-blocked", text: /blocked \(no_progress\)/
+    assert_select ".tp-blocked-detail", text: /No progress: repeated the same tool call 4 times/
     assert_select "a[href=?]", project_task_agent_run_path(@project, task, 1), text: "run #1"
   end
 

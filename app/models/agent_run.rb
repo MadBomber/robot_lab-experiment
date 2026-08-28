@@ -7,4 +7,9 @@ class AgentRun < ApplicationRecord
        { pending: "pending", running: "running", completed: "completed",
          failed: "failed", blocked: "blocked", cancelled: "cancelled" },
        default: "pending"
+
+  validates :agent_type, :status, presence: true
+  # presence: true would reject `false` (false.present? is false) -- this is
+  # a boolean, so validate against the pair of legal values instead.
+  validates :cancel_requested, inclusion: { in: [true, false] }
 end

@@ -25,6 +25,15 @@ document.addEventListener('turbo:load', () => {
   });
 
   observer.observe(el, { childList: true, subtree: true });
+
+  const collapseToggle = document.getElementById('tp-collapse-toggle');
+  if (collapseToggle) {
+    collapseToggle.addEventListener('change', () => {
+      document.querySelectorAll('.tp-collapsible').forEach((details) => {
+        details.open = !collapseToggle.checked;
+      });
+    });
+  }
 });
 
 (function startHeartbeatPolling() {

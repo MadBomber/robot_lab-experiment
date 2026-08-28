@@ -36,6 +36,7 @@ gem "bootsnap", require: false
 
 # Use Active Storage variants [https://guides.rubyonrails.org/active_storage_overview.html#transforming-images]
 gem "image_processing", "~> 2.0"
+gem "ruby-vips", "~> 2.0"
 
 group :development, :test do
   # See https://guides.rubyonrails.org/debugging_rails_applications.html#debugging-with-the-debug-gem
@@ -48,6 +49,9 @@ group :development, :test do
   gem "bundler-audit", require: false
 
   # Code complexity, structural duplication, and code smell checks (asgard quality)
+  gem "active_record_doctor"
+  gem "erb_lint", require: false
+  gem "fasterer", require: false
   gem "flay", require: false
   gem "flog", require: false
   gem "rails_best_practices", require: false

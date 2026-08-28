@@ -1,13 +1,45 @@
-<div class="message message-<%= message.msg_type %>" id="message_<%= message.id %>">
-  <span class="message-type"><%= message.msg_type %></span>
-  <% case message.msg_type %>
-  <% when "assistant", "assistant_thinking", "user", "system" %>
-    <pre><%= message.payload["text"] || message.payload["content"] %></pre>
-  <% when "tool_use" %>
-    <pre><%= message.payload["tool_name"] %>(<%= message.payload["tool_input"] %>)</pre>
-  <% when "tool_result" %>
-    <pre><%= message.payload["content"] %></pre>
-  <% else %>
-    <pre><%= message.payload %></pre>
-  <% end %>
-</div>
+<% case message.msg_type %>
+<% when "user", "assistant", "system", "result" %>
+  <div class="tp-msg tp-msg-<%= message.msg_type %>" id="message_<%= message.id %>">
+    <div class="tp-msg-body">
+      <div class="tp-msg-head">
+        <%= message_icon(message.msg_type) %>
+        <span class="tp-msg-type"><%= message.msg_type %></span>
+        <% if message.created_at %>
+          <span class="tp-msg-time"><%= message.created_at.strftime("%H:%M:%S") %></span>
+        <% end %>
+      </div>
+      <div class="tp-msg-text"><%= message.payload["text"] || message.payload["content"] %></div>
+    </div>
+  </div>
+<% when "assistant_thinking", "tool_use", "tool_result" %>
+  <details class="tp-msg tp-msg-<%= message.msg_type %> tp-collapsible" id="message_<%= message.id %>" <%= "open" unless message.assistant_thinking? %>>
+    <summary>
+      <div class="tp-msg-head">
+        <%= message_icon(message.msg_type) %>
+        <span class="tp-msg-type"><%= message.tool_use? ? message.payload["tool_name"] : message.msg_type %></span>
+        <span class="tp-summary-line"><%= message_summary_line(message) %></span>
+        <% if message.created_at %>
+          <span class="tp-msg-time"><%= message.created_at.strftime("%H:%M:%S") %></span>
+        <% end %>
+      </div>
+    </summary>
+    <div class="tp-msg-detail">
+      <% if message.tool_use? %>
+        <div class="tp-code"><%= message.payload["tool_input"] %></div>
+      <% else %>
+        <div class="tp-code"><%= message.payload["text"] || message.payload["content"] %></div>
+      <% end %>
+    </div>
+  </details>
+<% else %>
+  <div class="tp-msg tp-msg-<%= message.msg_type %>" id="message_<%= message.id %>">
+    <div class="tp-msg-body">
+      <div class="tp-msg-head">
+        <%= message_icon(message.msg_type) %>
+        <span class="tp-msg-type"><%= message.msg_type %></span>
+      </div>
+      <pre class="tp-msg-text"><%= message.payload %></pre>
+    </div>
+  </div>
+<% end %>

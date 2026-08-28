@@ -25,4 +25,15 @@ class AgentRunTest < ActiveSupport::TestCase
     assert_equal %w[planning implementation review pr audit], AgentRun.agent_types.keys
     assert_raises(ArgumentError) { run.agent_type = "yolo" }
   end
+
+  test "requires an agent_type" do
+    run = AgentRun.new(task: @task, conversation: @conversation, agent_type: nil)
+    assert_not run.valid?
+    assert_includes run.errors[:agent_type], "can't be blank"
+  end
+
+  test "cancel_requested accepts false without being treated as blank" do
+    run = AgentRun.new(task: @task, conversation: @conversation, agent_type: "planning", cancel_requested: false)
+    assert run.valid?
+  end
 end

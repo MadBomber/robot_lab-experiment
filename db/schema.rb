@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_19_120002) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_28_205946) do
   create_table "agent_runs", force: :cascade do |t|
     t.string "agent_type", null: false
     t.boolean "cancel_requested", default: false, null: false
@@ -19,9 +19,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_19_120002) do
     t.string "status", default: "pending", null: false
     t.integer "task_id", null: false
     t.datetime "updated_at", null: false
-    t.index ["conversation_id"], name: "index_agent_runs_on_conversation_id"
+    t.index ["conversation_id"], name: "index_agent_runs_on_conversation_id", unique: true
     t.index ["task_id", "status"], name: "index_agent_runs_on_task_id_and_status"
-    t.index ["task_id"], name: "index_agent_runs_on_task_id"
   end
 
   create_table "conversations", force: :cascade do |t|
@@ -45,7 +44,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_19_120002) do
     t.string "uuid", null: false
     t.index ["conversation_id", "seq"], name: "index_messages_on_conversation_id_and_seq"
     t.index ["conversation_id", "uuid"], name: "index_messages_on_conversation_id_and_uuid", unique: true
-    t.index ["conversation_id"], name: "index_messages_on_conversation_id"
   end
 
   create_table "projects", force: :cascade do |t|
@@ -76,6 +74,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_19_120002) do
     t.boolean "workflow_complete", default: false, null: false
     t.integer "workflow_run_count", default: 0, null: false
     t.string "worktree_path"
+    t.index ["blocked_run_id"], name: "index_tasks_on_blocked_run_id"
     t.index ["project_id"], name: "index_tasks_on_project_id"
     t.index ["status"], name: "index_tasks_on_status"
   end

@@ -4,6 +4,8 @@
 # build/install/release tasks (mirrors sqa_project/sqa-rails/.loki, the only
 # other non-gem app in this asgard ecosystem).
 
+import_up "dev/*.loki"
+
 class Tasks
   header "robot_lab-experiment — self-building RobotLab pipeline (Rails app)"
 
@@ -31,6 +33,7 @@ class Tasks
     sh "bin/rails db:migrate"
   end
 
+=begin
   desc "Run the test suite"
   def test
     sh "bin/rails test"
@@ -117,6 +120,7 @@ class Tasks
     print_quality_summary(results)
   end
 
+  ##################################
   no_commands do
     # Coverage summary line for `asgard quality`, e.g.
     #   [PASS] code coverage > 90% @ 96.98%
@@ -225,4 +229,5 @@ class Tasks
       puts "\n#{green.call("All quality gates passed.")}"
     end
   end
+=end
 end

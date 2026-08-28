@@ -1,0 +1,14 @@
+---
+linters:
+  # This app has no I18n usage anywhere (single-locale app), so flagging
+  # every hard-coded string in a view is pure noise, not a real finding.
+  HardCodedString:
+    enabled: false
+
+  # Runs the full RuboCop cop set against each isolated <% %>/<%= %> snippet
+  # in a view as if it were a standalone file, so file-level cops like
+  # Style/FrozenStringLiteralComment and Layout/TrailingEmptyLines fire on
+  # every single snippet. rubocop already covers app/**/*.rb; this app
+  # relies on that instead of re-running RuboCop per ERB fragment.
+  Rubocop:
+    enabled: false

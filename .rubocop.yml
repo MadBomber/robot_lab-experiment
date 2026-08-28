@@ -7,3 +7,7 @@ AllCops:
     - 'bin/**/*'
     - 'config/**/*'
     - 'vendor/**/*'
+
+    # archspec's own convention requires this exact capitalized filename
+    # (mirrors Gemfile/Rakefile) -- not something we can rename to snake_case.
+    - 'Archspec.rb'

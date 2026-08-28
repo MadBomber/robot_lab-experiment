@@ -10,7 +10,7 @@ class Task < ApplicationRecord
 
   belongs_to :project
   has_many :conversations, dependent: :destroy
-  has_many :agent_runs, dependent: :destroy
+  has_many :agent_runs, dependent: :delete_all
 
   # Not persisted -- only carries the New Task form's description through to
   # TaskDocument.seed (and back to the form on a validation-error re-render).
@@ -22,6 +22,11 @@ class Task < ApplicationRecord
 
   validates :title, presence: true
   validates :blocked_reason, inclusion: { in: BLOCKED_REASONS }, allow_nil: true
+  validates :status, :task_kind, presence: true
+  validates :workflow_run_count, :no_progress_streak, presence: true
+  # presence: true would reject `false` (false.present? is false) -- these are
+  # booleans, so validate against the pair of legal values instead.
+  validates :planning_complete, :workflow_complete, :pr_agent_complete, inclusion: { in: [true, false] }
 
   def blocked?
     blocked_reason.present?
@@ -50,6 +55,37 @@ class Task < ApplicationRecord
     return ["implementation"] unless workflow_complete?
 
     ["pr"]
+  end
+
+  # The four fix-pipeline stages in order, for the UI's stepper. Audit tasks
+  # follow a different single-stage flow and aren't represented here.
+  PIPELINE_STAGES = %w[planning implementation review pr].freeze
+
+  # The agent_type the pipeline is on right now, or nil once it's finished.
+  # Mirrors the same flags #runnable_agent_types reads, so the stepper never
+  # invents its own notion of "where we are."
+  def current_pipeline_stage
+    return running_agent_run.agent_type if running_agent_run
+    return "planning" unless planning_complete?
+    return agent_runs.order(:created_at).last&.agent_type || "implementation" unless workflow_complete?
+    return "pr" unless pr_agent_complete?
+
+    nil
+  end
+
+  # :done / :active / :pending for one stage, for the stepper to color.
+  # Implementation and review share one "done" signal (workflow_complete)
+  # since they alternate rather than complete independently -- see
+  # AgentRunCompletionHandler.
+  def pipeline_stage_status(stage)
+    case stage
+    when "planning"
+      planning_complete? ? :done : stage_active_or_pending(stage)
+    when "implementation", "review"
+      workflow_complete? ? :done : stage_active_or_pending(stage)
+    when "pr"
+      pr_agent_complete? ? :done : stage_active_or_pending(stage)
+    end
   end
 
   def unblock!
@@ -89,6 +125,10 @@ class Task < ApplicationRecord
   end
 
   private
+
+  def stage_active_or_pending(stage)
+    current_pipeline_stage == stage ? :active : :pending
+  end
 
   def audit_runnable_types
     agent_runs.audit.exists? ? [] : ["audit"]

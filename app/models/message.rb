@@ -13,4 +13,9 @@ class Message < ApplicationRecord
 
   validates :uuid, presence: true, uniqueness: { scope: :conversation_id }
   validates :seq, presence: true
+  validates :msg_type, presence: true
+  # presence: true would reject `{}` (an empty Hash is blank) -- payload is a
+  # JSON column that's legitimately `{}` in tests and for some msg_types, so
+  # only nil is actually invalid.
+  validates :payload, exclusion: { in: [nil], message: "can't be blank" }
 end

@@ -29,6 +29,16 @@ class TaskTest < ActiveSupport::TestCase
     assert_includes task.errors[:blocked_reason], "is not included in the list"
   end
 
+  test "planning_complete accepts false without being treated as blank" do
+    task = Task.new(project: @project, title: "Do the thing", planning_complete: false)
+    assert task.valid?
+  end
+
+  test "workflow_run_count accepts zero without being treated as blank" do
+    task = Task.new(project: @project, title: "Do the thing", workflow_run_count: 0)
+    assert task.valid?
+  end
+
   test "iteration_cap_reached? at and above MAX_WORKFLOW_RUNS" do
     task = Task.new(workflow_run_count: Task::MAX_WORKFLOW_RUNS - 1)
     assert_not task.iteration_cap_reached?
@@ -202,6 +212,55 @@ class TaskTest < ActiveSupport::TestCase
     assert_no_changes -> { task.updated_at } do
       task.recompute_status!
     end
+  end
+
+  test "current_pipeline_stage is planning until planning completes" do
+    task = Task.create!(project: @project, title: "Do the thing")
+    assert_equal "planning", task.current_pipeline_stage
+  end
+
+  test "current_pipeline_stage follows the running agent_run when one exists" do
+    task = Task.create!(project: @project, title: "Do the thing", planning_complete: true)
+    make_run(task, "review", status: "running")
+    assert_equal "review", task.current_pipeline_stage
+  end
+
+  test "current_pipeline_stage falls back to the last run's agent_type between runs" do
+    task = Task.create!(project: @project, title: "Do the thing", planning_complete: true)
+    make_run(task, "implementation", status: "completed")
+    assert_equal "implementation", task.current_pipeline_stage
+  end
+
+  test "current_pipeline_stage is pr once workflow_complete but pr hasn't run yet" do
+    task = Task.create!(project: @project, title: "Do the thing", planning_complete: true, workflow_complete: true)
+    assert_equal "pr", task.current_pipeline_stage
+  end
+
+  test "current_pipeline_stage is nil once the pr agent completes" do
+    task = Task.create!(project: @project, title: "Do the thing",
+                        planning_complete: true, workflow_complete: true, pr_agent_complete: true)
+    assert_nil task.current_pipeline_stage
+  end
+
+  test "pipeline_stage_status marks planning done once planning_complete" do
+    task = Task.create!(project: @project, title: "Do the thing", planning_complete: true, workflow_complete: true)
+    assert_equal :done, task.pipeline_stage_status("planning")
+  end
+
+  test "pipeline_stage_status marks the current stage active and others pending" do
+    task = Task.create!(project: @project, title: "Do the thing", planning_complete: true)
+    make_run(task, "implementation", status: "running")
+
+    assert_equal :done, task.pipeline_stage_status("planning")
+    assert_equal :active, task.pipeline_stage_status("implementation")
+    assert_equal :pending, task.pipeline_stage_status("review")
+    assert_equal :pending, task.pipeline_stage_status("pr")
+  end
+
+  test "pipeline_stage_status marks implementation and review done together once workflow_complete" do
+    task = Task.create!(project: @project, title: "Do the thing", planning_complete: true, workflow_complete: true)
+    assert_equal :done, task.pipeline_stage_status("implementation")
+    assert_equal :done, task.pipeline_stage_status("review")
   end
 
   private

@@ -1,7 +1,7 @@
 class Conversation < ApplicationRecord
   belongs_to :task
-  has_one :agent_run, dependent: :destroy
-  has_many :messages, -> { order(seq: :asc) }, dependent: :destroy
+  has_one :agent_run, dependent: :delete
+  has_many :messages, -> { order(seq: :asc) }, dependent: :delete_all
 
   validates :provider, presence: true
   validates :model, presence: true

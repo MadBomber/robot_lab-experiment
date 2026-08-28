@@ -33,6 +33,21 @@ class MessageTest < ActiveSupport::TestCase
     assert other_message.valid?
   end
 
+  test "requires a msg_type" do
+    message = @conversation.messages.build(uuid: "no-type", seq: 1, msg_type: nil, payload: {})
+    assert_not message.valid?
+    assert_includes message.errors[:msg_type], "can't be blank"
+  end
+
+  test "payload allows an empty hash but not nil" do
+    with_payload = @conversation.messages.build(uuid: "empty-payload", seq: 1, msg_type: "user", payload: {})
+    assert with_payload.valid?
+
+    without_payload = @conversation.messages.build(uuid: "nil-payload", seq: 1, msg_type: "user", payload: nil)
+    assert_not without_payload.valid?
+    assert_includes without_payload.errors[:payload], "can't be blank"
+  end
+
   test "supports the system msg_type without colliding with Kernel#system" do
     message = @conversation.messages.create!(uuid: "sys-1", seq: 1, msg_type: "system", payload: { text: "note" })
 
