@@ -118,4 +118,68 @@ class TranscriptRecorderTest < ActiveSupport::TestCase
     assert_equal "abc", tool_result.payload["tool_use_id"]
     assert_equal "file body", tool_result.payload["content"]
   end
+
+  test "assistant content messages are broadcast live" do
+    calls = []
+    Turbo::StreamsChannel.stub(:broadcast_append_to, ->(*_args, **kwargs) { calls << kwargs }) do
+      @recorder.record_content(FakeChunk.new("hello", nil))
+      @recorder.finish
+    end
+
+    assert_equal 1, calls.size
+    message = calls.dig(0, :locals, :message)
+    assert message.assistant?
+    assert_equal "hello", message.payload["text"]
+  end
+
+  test "tool_use and tool_result messages are broadcast live" do
+    calls = []
+    tool_call = RubyLLM::ToolCall.new(id: "t1", name: "read_file", arguments: {})
+    Turbo::StreamsChannel.stub(:broadcast_append_to, ->(*_args, **kwargs) { calls << kwargs }) do
+      @recorder.record_tool_call(tool_call)
+      @recorder.record_tool_result("done")
+    end
+
+    assert_equal 2, calls.size
+    assert calls[0].dig(:locals, :message).tool_use?
+    assert calls[1].dig(:locals, :message).tool_result?
+  end
+
+  test "record_tool_result persists a message with nil tool_use_id when no tool call is pending" do
+    @recorder.record_tool_result("orphan result")
+
+    message = @conversation.messages.sole
+    assert message.tool_result?
+    assert_nil message.payload["tool_use_id"]
+    assert_equal "orphan result", message.payload["content"]
+  end
+
+  test "multiple thinking and content switches produce ordered messages" do
+    @recorder.record_content(FakeChunk.new(nil, FakeThinking.new("think1")))
+    @recorder.record_content(FakeChunk.new("content1", nil))
+    @recorder.record_content(FakeChunk.new(nil, FakeThinking.new("think2")))
+    @recorder.record_content(FakeChunk.new("content2", nil))
+    @recorder.finish
+
+    messages = @conversation.messages.order(:seq)
+    assert_equal %w[assistant_thinking assistant assistant_thinking assistant], messages.pluck(:msg_type)
+    assert_equal ["think1", "content1", "think2", "content2"], messages.map { |m| m.payload["text"] }
+  end
+
+  test "record_tool_call flushes buffered content before persisting the tool call" do
+    @recorder.record_content(FakeChunk.new("hello", nil))
+    @recorder.record_tool_call(RubyLLM::ToolCall.new(id: "tc1", name: "read_file", arguments: {}))
+
+    messages = @conversation.messages.order(:seq)
+    assert_equal %w[assistant tool_use], messages.pluck(:msg_type)
+    assert_equal "hello", messages.first.payload["text"]
+    assert_equal "tc1", messages.second.payload["tool_use_id"]
+  end
+
+  test "empty thinking chunks do not create assistant_thinking rows" do
+    @recorder.record_content(FakeChunk.new(nil, FakeThinking.new("")))
+    @recorder.finish
+
+    assert_equal 0, @conversation.messages.count
+  end
 end
