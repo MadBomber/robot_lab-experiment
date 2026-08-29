@@ -114,6 +114,19 @@ class TasksControllerTest < ActionDispatch::IntegrationTest
     assert_select "a[href=?]", project_task_agent_run_path(@project, task, 1), text: "run #1"
   end
 
+  test "show renders blocked detail without a link when the blocking run has been deleted" do
+    task = Task.create!(project: @project, title: "Stuck", blocked_reason: "no_progress",
+                        blocked_detail: "No progress: repeated the same tool call 4 times during run #1 (implementation)",
+                        blocked_run_id: 999)
+
+    get project_task_url(@project, task)
+
+    assert_response :success
+    assert_select ".tp-pill-blocked", text: /blocked \(no_progress\)/
+    assert_select ".tp-blocked-detail", text: /No progress: repeated the same tool call 4 times/
+    assert_select ".tp-blocked-detail a", count: 0
+  end
+
   test "unblock clears blocked_reason and redirects back to the task" do
     task = Task.create!(project: @project, title: "Add login", blocked_reason: "human_requested",
                         blocked_detail: "paused by a human", blocked_run_id: 123)
