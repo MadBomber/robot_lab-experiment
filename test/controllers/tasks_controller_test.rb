@@ -71,6 +71,32 @@ class TasksControllerTest < ActionDispatch::IntegrationTest
     FileUtils.rm_rf(archive_root)
   end
 
+  test "create renders errors and leaves no orphaned task/worktree when the task doc fails to seed" do
+    archive_root = Dir.mktmpdir("archive_root")
+    previous_env = ENV.fetch("ROBOT_LAB_EXPERIMENT_ARCHIVE_ROOT", nil)
+    ENV["ROBOT_LAB_EXPERIMENT_ARCHIVE_ROOT"] = archive_root
+
+    TaskDocument.stub(:seed, ->(*) { raise Errno::ENOSPC, "no space left" }) do
+      post project_tasks_url(@project), params: { task: { title: "Add login", description: "Please add a login page" } }
+    end
+
+    assert_response :unprocessable_entity
+    assert_equal 0, @project.tasks.count
+    assert_empty Dir.glob("#{@repo_dir}-worktrees/task-*")
+  ensure
+    ENV["ROBOT_LAB_EXPERIMENT_ARCHIVE_ROOT"] = previous_env
+    FileUtils.rm_rf(archive_root)
+  end
+
+  test "create renders errors and creates no task when the worktree cannot be created" do
+    WorktreeService.stub(:new, ->(_task) { raise WorktreeService::Error, "boom" }) do
+      post project_tasks_url(@project), params: { task: { title: "Add login", description: "Please add a login page" } }
+    end
+
+    assert_response :unprocessable_entity
+    assert_equal 0, @project.tasks.count
+  end
+
   test "new pre-fills title and description from a from_issue param" do
     issue = GithubIssueService::Issue.new(number: 5, title: "Fix the thing", body: "Steps to reproduce...",
                                           url: "https://github.com/x/y/issues/5")

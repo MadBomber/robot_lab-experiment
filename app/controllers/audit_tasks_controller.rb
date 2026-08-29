@@ -1,19 +1,17 @@
 class AuditTasksController < ApplicationController
   def create
     project = Project.find(params[:project_id])
-    task = nil
+    original_request = "Self-audit: investigate this codebase and file a GitHub " \
+                       "issue for each concrete, verifiable problem found."
 
-    ActiveRecord::Base.transaction do
-      task = project.tasks.create!(
-        title: "Self-audit #{Time.current.strftime('%Y-%m-%d %H:%M')}", task_kind: "audit"
-      )
-      WorktreeService.new(task).create
-    end
-    TaskDocument.seed(task, "Self-audit: investigate this codebase and file a GitHub " \
-                            "issue for each concrete, verifiable problem found.")
+    task = TaskCreationService.new(
+      project,
+      attributes: { title: "Self-audit #{Time.current.strftime('%Y-%m-%d %H:%M')}", task_kind: "audit" },
+      original_request:
+    ).call
 
     redirect_to [project, task], notice: "Self-audit task created."
-  rescue ActiveRecord::RecordInvalid, WorktreeService::Error => e
+  rescue TaskCreationService::Error => e
     redirect_to project, alert: "Could not start self-audit: #{e.message}"
   end
 end
