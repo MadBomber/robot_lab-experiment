@@ -44,4 +44,21 @@ class AuditTasksControllerTest < ActionDispatch::IntegrationTest
     assert_redirected_to project_url(@project)
     assert_equal 0, @project.tasks.count
   end
+
+  test "redirects to the project with an alert and leaves no orphaned task/worktree when the task doc fails to seed" do
+    archive_root = Dir.mktmpdir("archive_root")
+    previous_env = ENV.fetch("ROBOT_LAB_EXPERIMENT_ARCHIVE_ROOT", nil)
+    ENV["ROBOT_LAB_EXPERIMENT_ARCHIVE_ROOT"] = archive_root
+
+    TaskDocument.stub(:seed, ->(*) { raise Errno::ENOSPC, "no space left" }) do
+      post project_audit_tasks_url(@project)
+    end
+
+    assert_redirected_to project_url(@project)
+    assert_equal 0, @project.tasks.count
+    assert_empty Dir.glob("#{@repo_dir}-worktrees/task-*")
+  ensure
+    ENV["ROBOT_LAB_EXPERIMENT_ARCHIVE_ROOT"] = previous_env
+    FileUtils.rm_rf(archive_root)
+  end
 end

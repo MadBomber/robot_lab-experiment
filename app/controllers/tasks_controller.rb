@@ -8,16 +8,18 @@ class TasksController < ApplicationController
   end
 
   def create
-    @task = @project.tasks.new(title: task_params[:title], description: task_params[:description])
+    title = task_params[:title]
+    description = task_params[:description]
 
-    ActiveRecord::Base.transaction do
-      @task.save!
-      WorktreeService.new(@task).create
-    end
-    TaskDocument.seed(@task, task_params[:description].presence || @task.title)
+    task = TaskCreationService.new(
+      @project,
+      attributes: { title:, description: },
+      original_request: description.presence || title
+    ).call
 
-    redirect_to [@project, @task], notice: "Task created."
-  rescue ActiveRecord::RecordInvalid, WorktreeService::Error => e
+    redirect_to [@project, task], notice: "Task created."
+  rescue TaskCreationService::Error => e
+    @task = @project.tasks.new(title:, description:)
     @task.errors.add(:base, e.message)
     render :new, status: :unprocessable_entity
   end
