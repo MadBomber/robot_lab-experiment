@@ -163,7 +163,7 @@ class TranscriptRecorderTest < ActiveSupport::TestCase
 
     messages = @conversation.messages.order(:seq)
     assert_equal %w[assistant_thinking assistant assistant_thinking assistant], messages.pluck(:msg_type)
-    assert_equal ["think1", "content1", "think2", "content2"], messages.map { |m| m.payload["text"] }
+    assert_equal(%w[think1 content1 think2 content2], messages.map { |m| m.payload["text"] })
   end
 
   test "record_tool_call flushes buffered content before persisting the tool call" do

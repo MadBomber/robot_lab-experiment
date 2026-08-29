@@ -160,7 +160,7 @@ class AgentRunJob < ApplicationJob
 
   def review_tools(cwd, task, level)
     [ReadFileTool.new(cwd:, sandbox_level: level), GlobTool.new(cwd:, sandbox_level: level),
-     GrepTool.new(cwd:, sandbox_level: level), BashTool.new(cwd:),
+     GrepTool.new(cwd:, sandbox_level: level), BashTool.new(cwd:), QualityGateTool.new(cwd:),
      MarkWorkflowCompleteTool.new(task:), MarkWorkflowBlockedTool.new(task:)]
   end
 
