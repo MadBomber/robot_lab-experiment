@@ -50,6 +50,12 @@ class ProjectsController < ApplicationController
     begin
       ProjectDestructionService.new(@project).call
       redirect_to projects_url, notice: "Project '#{@project.name}' and all associated tasks/worktrees have been deleted."
+    rescue ProjectDestructionService::CleanupError => e
+      # DB destroy succeeded; only best-effort filesystem cleanup partially
+      # failed -- a much smaller problem, so this stays a notice rather than
+      # an alert, mirroring TasksController#clear_completed's severity for
+      # the same "mostly succeeded, stray leftover" outcome.
+      redirect_to projects_url, notice: e.message
     rescue ProjectDestructionService::Error => e
       redirect_to projects_url, alert: e.message
     end

@@ -12,6 +12,13 @@
 class ProjectDestructionService
   class Error < StandardError; end
 
+  # Raised only when the DB destroy itself succeeded and some best-effort
+  # filesystem cleanup afterward failed -- a distinct, much less severe
+  # outcome than Error (DB destroy failed, project still exists), so callers
+  # can flash it as a notice rather than an alert. See
+  # ProjectsController#destroy.
+  class CleanupError < Error; end
+
   def initialize(project)
     @project = project
   end
@@ -25,16 +32,18 @@ class ProjectDestructionService
     failed = tasks.reject { |task| cleanup_task_filesystem(task) }
     return if failed.empty?
 
-    raise Error, "Project '#{project_name}' was deleted, but filesystem cleanup failed for " \
-                 "#{failed.size} #{'task'.pluralize(failed.size)} (task ids: #{failed.map(&:id).join(', ')})"
+    raise CleanupError, "Project '#{project_name}' was deleted, but filesystem cleanup failed for " \
+                        "#{failed.size} #{'task'.pluralize(failed.size)} (task ids: #{failed.map(&:id).join(', ')})"
   end
 
   private
 
+  # destroy! on a record with dependent: :destroy/:delete_all associations
+  # (Task -> Conversation/AgentRun, see Task/Conversation models) already runs
+  # its whole callback chain -- including those cascades -- inside its own
+  # transaction, so no explicit wrapper is needed here.
   def destroy_project!(project_name)
-    ActiveRecord::Base.transaction do
-      @project.destroy!
-    end
+    @project.destroy!
   rescue => e
     raise Error, "Could not destroy project '#{project_name}': #{e.message}"
   end
