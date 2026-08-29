@@ -1,3 +1,0 @@
-def unblock!
-    update!(blocked_reason: nil, blocked_detail: nil, blocked_run_id: nil, no_progress_streak: 0)
-  end

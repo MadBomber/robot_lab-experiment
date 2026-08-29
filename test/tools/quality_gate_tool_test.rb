@@ -142,7 +142,7 @@ class QualityGateToolTest < ActiveSupport::TestCase
   def stub_commands(command_map, &block)
     fake_popen2e = lambda do |_env, command, **_kwargs, &block|
       output, status = command_map.fetch(command, ["", success])
-      stdin = Object.new.tap { |o| o.define_singleton_method(:close) {} }
+      stdin = Object.new.tap { |o| o.define_singleton_method(:close) { nil } }
       wait = Object.new.tap { |o| o.define_singleton_method(:value) { status } }
       block.call(stdin, StringIO.new(output), wait)
     end
