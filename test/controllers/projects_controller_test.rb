@@ -127,4 +127,40 @@ class ProjectsControllerTest < ActionDispatch::IntegrationTest
     assert_redirected_to projects_url
     refute Project.exists?(project.id)
   end
+
+  test "destroy flashes an alert when the DB destroy itself fails" do
+    project = Project.create!(name: "To Delete", repo_folder_path: @repo_dir)
+    error = ProjectDestructionService::Error.new("Could not destroy project 'To Delete': boom")
+
+    ProjectDestructionService.stub(:new, ->(*) { raise_stub(error) }) do
+      delete project_url(project)
+    end
+
+    assert_redirected_to projects_url
+    assert_equal error.message, flash[:alert]
+    assert_nil flash[:notice]
+  end
+
+  test "destroy flashes a notice, not an alert, when the DB destroy succeeds but filesystem cleanup partially fails" do
+    project = Project.create!(name: "To Delete", repo_folder_path: @repo_dir)
+    error = ProjectDestructionService::CleanupError.new(
+      "Project 'To Delete' was deleted, but filesystem cleanup failed for 1 task (task ids: 1)"
+    )
+
+    ProjectDestructionService.stub(:new, ->(*) { raise_stub(error) }) do
+      delete project_url(project)
+    end
+
+    assert_redirected_to projects_url
+    assert_equal error.message, flash[:notice]
+    assert_nil flash[:alert]
+  end
+
+  private
+
+  # Returns an object whose #call raises the given error, standing in for a
+  # real ProjectDestructionService instance in the two tests above.
+  def raise_stub(error)
+    Object.new.tap { |stub| stub.define_singleton_method(:call) { raise error } }
+  end
 end
