@@ -85,9 +85,12 @@ class TranscriptRecorder
   def broadcast_message(message)
     return unless defined?(Turbo::StreamsChannel)
 
+    # The tasks/show transcript is a poetry_message_scroller(id: "transcript");
+    # its Turbo Stream append target is the scroller's content element,
+    # which renders with dom id "<id>-messages".
     Turbo::StreamsChannel.broadcast_append_to(
       "task_#{@conversation.task_id}",
-      target: "transcript",
+      target: "transcript-messages",
       partial: "messages/message",
       locals: { message: }
     )

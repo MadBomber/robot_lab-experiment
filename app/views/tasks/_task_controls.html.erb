@@ -1,67 +1,79 @@
-<aside class="tp-sidebar" id="task-sidebar">
-<div class="tp-panel">
-  <h2>Task</h2>
-  <div class="tp-kv">
-    <span class="tp-k">Status</span>
-    <%= form_with url: update_status_project_task_path(project, task), method: :patch, class: "inline-flex items-center gap-1" do |f| %>
-      <%= f.select :status, Task.statuses.keys, { selected: task.status }, class: "tp-v" %>
-      <%= f.submit "Set", class: "tp-btn tp-btn-quiet", style: "padding: 3px 8px; font-size: 11px;" %>
-    <% end %>
-  </div>
-  <div class="tp-kv"><span class="tp-k">Workflow runs</span><span class="tp-v"><%= task.workflow_run_count %> / <%= Task::MAX_WORKFLOW_RUNS %></span></div>
-  <div class="tp-progress"><span style="width: <%= (task.workflow_run_count.to_f / Task::MAX_WORKFLOW_RUNS * 100).clamp(0, 100) %>%"></span></div>
-
-  <div class="tp-btnrow">
-    <% task.runnable_agent_types.each do |agent_type| %>
-      <%= button_to "Run #{agent_type}", project_task_agent_runs_path(project, task),
-            params: { agent_type: agent_type }, class: "tp-btn tp-btn-primary" %>
-    <% end %>
-    <% if task.running_agent_run.present? %>
-      <%= button_to "Stop", stop_project_task_path(project, task), method: :post, class: "tp-btn tp-btn-danger" %>
-      <%= button_to "Pause", pause_project_task_path(project, task), method: :post, class: "tp-btn tp-btn-warning" %>
-    <% end %>
-    <% if task.blocked? %>
-      <%= button_to "Resume", unblock_project_task_path(project, task), method: :post, class: "tp-btn tp-btn-warning" %>
-    <% end %>
-    <% unless task.completed? || task.blocked_reason == "abandoned" %>
-      <%= button_to "Abandon", abandon_project_task_path(project, task), method: :post,
-            data: { turbo_confirm: "Give up on this task and stop all agents?" }, class: "tp-btn tp-btn-quiet" %>
-    <% end %>
-  </div>
-</div>
-
-<% unless task.completed? %>
-  <div class="tp-panel">
-    <details class="tp-details" <%= "open" if task.pending_guidance? %>>
-      <summary>Give the agents guidance</summary>
-      <% if task.pending_guidance? %>
-        <p class="tp-hint">Queued for the next run: <span style="font-style: italic;"><%= task.pending_guidance %></span></p>
+<aside class="flex min-w-0 flex-col gap-4 lg:sticky lg:top-5" id="task-sidebar">
+  <%= poetry_card do |card| %>
+    <% card.with_title { "Task" } %>
+    <div class="space-y-3">
+      <%= form_with url: update_status_project_task_path(project, task), method: :patch,
+            class: "flex items-center justify-between gap-2" do %>
+        <span class="text-sm text-muted-foreground">Status</span>
+        <span class="flex items-center gap-1">
+          <%= poetry_native_select(name: "status", size: :sm, label: "Task status",
+                options: Task.statuses.keys.map { |s| [s.humanize, s] }, selected: task.status) %>
+          <%= poetry_button(variant: :secondary, size: :sm, type: :submit) { "Set" } %>
+        </span>
       <% end %>
-      <%= form_with url: guide_project_task_path(project, task), method: :post do |f| %>
-        <%= f.text_area :guidance, rows: 3, placeholder: "e.g. use the Playwright MCP server, not Selenium", class: "tp-textarea" %>
-        <%= f.submit "Send guidance", class: "tp-btn tp-btn-primary", style: "margin-top: 8px; width: 100%; justify-content: center;" %>
+
+      <%= poetry_meter(label: "Workflow runs", value: task.workflow_run_count, max: Task::MAX_WORKFLOW_RUNS,
+            value_text: "#{task.workflow_run_count} of #{Task::MAX_WORKFLOW_RUNS}") %>
+
+      <div class="flex flex-wrap gap-2">
+        <% task.runnable_agent_types.each do |agent_type| %>
+          <%= form_with url: project_task_agent_runs_path(project, task), method: :post, class: "inline" do %>
+            <%= hidden_field_tag :agent_type, agent_type %>
+            <%= poetry_button(size: :sm, type: :submit) { "Run #{agent_type}" } %>
+          <% end %>
+        <% end %>
+        <% if task.running_agent_run.present? %>
+          <%= form_with url: stop_project_task_path(project, task), method: :post, class: "inline" do %>
+            <%= poetry_button(variant: :destructive, size: :sm, type: :submit) { "Stop" } %>
+          <% end %>
+          <%= form_with url: pause_project_task_path(project, task), method: :post, class: "inline" do %>
+            <%= poetry_button(variant: :outline, size: :sm, type: :submit) { "Pause" } %>
+          <% end %>
+        <% end %>
+        <% if task.blocked? %>
+          <%= form_with url: unblock_project_task_path(project, task), method: :post, class: "inline" do %>
+            <%= poetry_button(variant: :outline, size: :sm, type: :submit) { "Resume" } %>
+          <% end %>
+        <% end %>
+        <% unless task.completed? || task.blocked_reason == "abandoned" %>
+          <%= form_with url: abandon_project_task_path(project, task), method: :post, class: "inline",
+                data: { turbo_confirm: "Give up on this task and stop all agents?" } do %>
+            <%= poetry_button(variant: :ghost, size: :sm, type: :submit) { "Abandon" } %>
+          <% end %>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
+
+  <% unless task.completed? %>
+    <%= poetry_card do |card| %>
+      <%= poetry_collapsible(open: task.pending_guidance?) do |collapsible| %>
+        <% collapsible.with_trigger { "Give the agents guidance" } %>
+        <div class="space-y-2 pt-2">
+          <% if task.pending_guidance? %>
+            <p class="text-xs text-muted-foreground">Queued for the next run: <em><%= task.pending_guidance %></em></p>
+          <% end %>
+          <%= form_with url: guide_project_task_path(project, task), method: :post, class: "space-y-2" do %>
+            <%= poetry_field(id: "task_guidance", label_text: "Guidance",
+                  hint: "Applied on the next run. To redirect an in-flight run, Stop it first.") do |field| %>
+              <%= poetry_textarea(name: "guidance", rows: 3,
+                    placeholder: "e.g. use the Playwright MCP server, not Selenium",
+                    **field.control_attributes) %>
+            <% end %>
+            <%= poetry_button(type: :submit, class: "w-full") { "Send guidance" } %>
+          <% end %>
+        </div>
       <% end %>
-      <p class="tp-hint">Applied on the next run. To redirect an in-flight run, Stop it first.</p>
-    </details>
-  </div>
-<% end %>
+    <% end %>
+  <% end %>
 
-<div class="tp-panel">
-  <details class="tp-details" <%= "open" if doc_content.present? %>>
-    <summary>Task doc</summary>
-    <pre class="tp-doc"><%= doc_content.presence || "(empty)" %></pre>
-  </details>
-</div>
-
-<div class="tp-panel">
-  <h2>Legend</h2>
-  <div class="tp-legend">
-    <div class="tp-row"><span class="tp-swatch" style="background: var(--tp-user)"></span>user</div>
-    <div class="tp-row"><span class="tp-swatch" style="background: var(--tp-assistant)"></span>assistant</div>
-    <div class="tp-row"><span class="tp-swatch" style="background: var(--tp-thinking)"></span>assistant thinking</div>
-    <div class="tp-row"><span class="tp-swatch" style="background: var(--tp-tool-use)"></span>tool call</div>
-    <div class="tp-row"><span class="tp-swatch" style="background: var(--tp-tool-result)"></span>tool result</div>
-    <div class="tp-row"><span class="tp-swatch" style="background: var(--tp-system)"></span>system</div>
-  </div>
-</div>
+  <%= poetry_card do |card| %>
+    <%= poetry_collapsible(open: doc_content.present?) do |collapsible| %>
+      <% collapsible.with_trigger { "Task doc" } %>
+      <div class="pt-2">
+        <%= poetry_code_block(code: doc_content.presence || "(empty)", language: "markdown",
+              label: "Task doc", class: "max-h-80 overflow-y-auto") %>
+      </div>
+    <% end %>
+  <% end %>
 </aside>

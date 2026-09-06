@@ -1,20 +1,39 @@
-<div class="w-full max-w-4xl">
-  <p class="text-sm text-gray-500 mb-1">
-    <%= link_to @project.name, @project %> &middot;
-    <%= link_to "task #{@task.id}", [@project, @task] %>
-  </p>
-  <h1 class="text-2xl font-bold mb-4">Run #<%= @agent_run.id %> (<%= @agent_run.agent_type %>)</h1>
+<div class="mx-auto w-full max-w-4xl">
+  <header class="flex flex-col gap-4">
+    <%= poetry_breadcrumb do |crumb| %>
+      <% crumb.with_item(@project.name, href: project_path(@project)) %>
+      <% crumb.with_item("task #{@task.id}", href: project_task_path(@project, @task)) %>
+      <% crumb.with_item("run ##{@agent_run.id}") %>
+    <% end %>
+    <div class="flex items-center gap-3">
+      <h1 class="text-2xl font-semibold tracking-tight">Run #<%= @agent_run.id %></h1>
+      <%= poetry_badge(variant: :outline) { @agent_run.agent_type } %>
+    </div>
+    <%= poetry_separator %>
+  </header>
 
-  <div class="space-y-4">
+  <div class="mt-6 space-y-3">
     <% @messages.each do |message| %>
-      <div class="border rounded p-3 text-sm">
-        <p class="text-xs text-gray-500 mb-1"><%= message.msg_type %> &middot; <%= message.created_at %></p>
-        <pre class="whitespace-pre-wrap"><%= JSON.pretty_generate(message.payload) %></pre>
+      <div class="rounded-lg border border-border bg-card px-4 py-3">
+        <div class="flex items-center gap-2">
+          <%= poetry_badge(variant: message_badge_variant(message.msg_type)) { message.msg_type.humanize } %>
+          <span class="ms-auto font-mono text-xs tabular-nums text-muted-foreground"><%= message.created_at %></span>
+        </div>
+        <div class="mt-2">
+          <%= poetry_code_block(code: JSON.pretty_generate(message.payload), language: "json",
+                label: "Message #{message.id} payload") %>
+        </div>
       </div>
     <% end %>
   </div>
 
   <% if @messages.empty? %>
-    <p class="text-gray-500">No transcript messages for this run.</p>
+    <div class="mt-6">
+      <%= poetry_empty(media_variant: :icon) do |empty| %>
+        <% empty.with_media { poetry_icon(name: :"message-square-off") } %>
+        <% empty.with_title { "No transcript" } %>
+        <% empty.with_description { "No transcript messages were recorded for this run." } %>
+      <% end %>
+    </div>
   <% end %>
 </div>

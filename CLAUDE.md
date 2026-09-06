@@ -64,6 +64,17 @@ All agent-facing tools subclass `RobotLab::Tool` through one of two base classes
 
 `Project 1--* Task 1--* Conversation 1--1 AgentRun`, `Conversation 1--* Message`. A `Task` can have many `Conversation`s (one per `AgentRun`) but the UI/handler only ever care about the single currently-`running` one (`Task#running_agent_run`). `Message#msg_type` enumerates the full transcript vocabulary: `user`, `assistant`, `assistant_thinking`, `tool_use`, `tool_result`, `system`, `result` — `TranscriptRecorder` is the only writer, pairing each `tool_use` with the next `tool_result` (assumes sequential tool execution; see the caveat comment in that file if robot_lab ever turns on concurrent tool calls).
 
+## UI: Poetry component library
+
+All views compose the [Poetry UI](https://poetryui.com) component library (`poetry-core`/`poetry-ui`/`poetry-lucide`/`poetry-agent` gems, default theme) — no hand-rolled Tailwind components or raw hex colors. Rules that bind here:
+
+- Compose with `poetry_*` helpers and Tailwind utilities on Poetry tokens (`bg-card`, `text-muted-foreground`, ...); never write `cn-*` classes or raw colors. Contracts live in `.claude/skills/poetry/` (installed by the generator; regenerate with `bin/rails g poetry:skill`).
+- Model-bound forms use `form_with(model:, builder: Poetry::Ui::FormBuilder)` + `f.input`.
+- After ANY ERB edit, run `bin/rails poetry:check` — it lints views against the component contracts and must pass clean.
+- The tasks/show transcript is a `poetry_message_scroller(id: "transcript")`; `TranscriptRecorder` broadcasts append to its content element (`transcript-messages`), and rows are `poetry_message_scroller_item`s rendered by `messages/_message`. Collapsible rows are native `<details>` (not `poetry_collapsible`) so the "Collapse tool calls" toggle can bulk-drive them.
+- App Stimulus controllers live in `app/javascript/controllers/` (`heartbeat`, `llm_options`, `transcript`); Poetry's 53 controllers register in `controllers/index.js` via `registerPoetryControllers`/`registerPoetryAgent`. Note `poetry:toggle:change` fires BEFORE the flip renders — read `event.detail.pressed`, not `aria-pressed`.
+- Upgrades: `bundle update` then re-run `bin/rails g poetry:install` (idempotent, theme-sticky) and `bin/rails tailwindcss:build`.
+
 ## Config
 
 Default LLM provider/model live as constants in `AgentRunner` (`ollama` / local model), not in `config/robot_lab.yml` (that file doesn't exist here — robot_lab's config cascade falls through to gem defaults + `RubyLLM.configure` in `config/initializers/ruby_llm.rb`, which points at a local Ollama server). `config/initializers/orphan_agent_run_recovery.rb` sweeps any `AgentRun` still `running` to `failed` at boot, scoped only to `rails server`/`bin/jobs` processes (never console/runner/rake/tests) — a server restart mid-turn shouldn't leave a task stuck.

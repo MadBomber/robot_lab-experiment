@@ -1,29 +1,16 @@
-<div class="w-full max-w-lg">
-  <h1 class="text-2xl font-bold mb-4">New task in <%= @project.name %></h1>
-
-  <% if @task.errors.any? %>
-    <div class="bg-red-50 text-red-700 p-3 rounded mb-4">
-      <ul>
-        <% @task.errors.full_messages.each do |message| %>
-          <li><%= message %></li>
-        <% end %>
-      </ul>
-    </div>
-  <% end %>
+<div class="mx-auto w-full max-w-lg">
+  <h1 class="mb-2 text-2xl font-semibold tracking-tight">New task in <%= @project.name %></h1>
 
   <% if params[:from_issue].present? %>
-    <p class="text-sm text-gray-500 mb-2">Pre-filled from issue #<%= params[:from_issue] %> -- review before creating.</p>
+    <p class="mb-4 text-sm text-muted-foreground">Pre-filled from issue #<%= params[:from_issue] %> -- review before creating.</p>
   <% end %>
 
-  <%= form_with model: @task, url: project_tasks_path(@project), class: "space-y-4" do |f| %>
-    <div>
-      <%= f.label :title, class: "block font-medium" %>
-      <%= f.text_field :title, class: "border rounded w-full p-2" %>
-    </div>
-    <div>
-      <%= f.label :description, "Describe the work (becomes the task doc's original request)", class: "block font-medium" %>
-      <%= f.text_area :description, rows: 6, class: "border rounded w-full p-2" %>
-    </div>
-    <%= f.submit "Create task", class: "bg-blue-600 text-white px-4 py-2 rounded" %>
+  <%= form_with model: @task, url: project_tasks_path(@project), builder: Poetry::Ui::FormBuilder, class: "mt-4" do |f| %>
+    <%= poetry_field_group do %>
+      <%= f.input :title %>
+      <%= f.input :description, as: :text, rows: 6, label: "Describe the work",
+            hint: "Becomes the task doc's original request." %>
+      <%= f.submit "Create task" %>
+    <% end %>
   <% end %>
 </div>

@@ -1,47 +1,65 @@
-<div class="tp-header" id="task-header">
-  <div class="tp-crumbrow">
-    <div class="tp-crumb">
-      <span class="tp-proj"><%= link_to project.name, project %></span>
-      <span class="tp-sep">/</span>
-      <h1><%= task.title %></h1>
-    </div>
-    <div class="tp-headmeta">
-      <% if task.blocked? %>
-        <span class="tp-pill tp-pill-blocked">blocked (<%= task.blocked_reason %>)</span>
-      <% elsif task.running_agent_run.present? %>
-        <span class="tp-pill tp-pill-running"><span class="tp-dot"></span><%= task.running_agent_run.agent_type %> running</span>
-      <% else %>
-        <span class="tp-pill"><%= task.status %></span>
+<header id="task-header" class="flex flex-col gap-4 rounded-xl border border-border bg-card px-5 py-4">
+  <div class="flex flex-wrap items-center justify-between gap-4">
+    <div class="min-w-0">
+      <%= poetry_breadcrumb do |crumb| %>
+        <% crumb.with_item(project.name, href: project_path(project)) %>
+        <% crumb.with_item(task.title) %>
       <% end %>
-      <span class="tp-runs">runs <%= task.workflow_run_count %>/<%= Task::MAX_WORKFLOW_RUNS %></span>
+    </div>
+    <div class="flex flex-wrap items-center gap-2">
+      <% if task.blocked? %>
+        <%= poetry_badge(variant: :destructive, class: "task-status-blocked") { "blocked (#{task.blocked_reason})" } %>
+      <% elsif task.running_agent_run.present? %>
+        <%= poetry_badge(variant: :info) do %>
+          <%= poetry_spinner(label: "Agent running", class: "size-3") %>
+          <%= task.running_agent_run.agent_type %> running
+        <% end %>
+      <% else %>
+        <%= poetry_badge(variant: :outline) { task.status.humanize } %>
+      <% end %>
+      <span class="font-mono text-xs tabular-nums text-muted-foreground">runs <%= task.workflow_run_count %>/<%= Task::MAX_WORKFLOW_RUNS %></span>
     </div>
   </div>
 
   <% if task.blocked? && task.blocked_detail? %>
-    <div class="tp-blocked-detail">
+    <div class="task-blocked-detail text-xs text-muted-foreground">
       <span><%= task.blocked_detail %></span>
       <% blocked_run = task.blocked_run_id? ? AgentRun.find_by(id: task.blocked_run_id) : nil %>
       <% if blocked_run %>
-        &middot; <%= link_to "run ##{blocked_run.id}", project_task_agent_run_path(task.project, task, blocked_run) %>
+        &middot; <%= poetry_link(href: project_task_agent_run_path(task.project, task, blocked_run)) { "run ##{blocked_run.id}" } %>
       <% end %>
     </div>
   <% end %>
 
   <% if task.fix? %>
-    <div class="tp-stepper">
-      <% Task::PIPELINE_STAGES.each do |stage| %>
-        <% status = task.pipeline_stage_status(stage) %>
-        <div class="tp-stage <%= "is-#{status}" if status != :pending %>">
-          <div class="tp-node">
-            <% if status == :done %>
-              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l4 4 10-10" /></svg>
-            <% else %>
-              <%= Task::PIPELINE_STAGES.index(stage) + 1 %>
-            <% end %>
-          </div>
-          <div class="tp-label"><%= stage.capitalize %></div>
-        </div>
-      <% end %>
-    </div>
+    <nav aria-label="Pipeline progress" class="max-w-xl">
+      <ol class="flex items-center gap-3">
+        <% Task::PIPELINE_STAGES.each_with_index do |stage, index| %>
+          <% status = task.pipeline_stage_status(stage) %>
+          <% unless index.zero? %>
+            <li aria-hidden="true" class="h-px min-w-8 flex-1 <%= status == :pending ? "bg-border" : "bg-primary" %>"></li>
+          <% end %>
+          <% case status %>
+          <% when :done %>
+            <li class="flex items-center gap-2">
+              <span class="flex size-7 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                <%= poetry_icon(name: :check, class: "size-4", label: "Completed") %>
+              </span>
+              <span class="text-sm font-medium"><%= stage.capitalize %></span>
+            </li>
+          <% when :active %>
+            <li aria-current="step" class="flex items-center gap-2">
+              <span class="flex size-7 items-center justify-center rounded-full border-2 border-primary text-sm font-semibold text-primary"><%= index + 1 %></span>
+              <span class="text-sm font-medium text-primary"><%= stage.capitalize %></span>
+            </li>
+          <% else %>
+            <li class="flex items-center gap-2">
+              <span class="flex size-7 items-center justify-center rounded-full border border-border text-sm text-muted-foreground"><%= index + 1 %></span>
+              <span class="text-sm text-muted-foreground"><%= stage.capitalize %></span>
+            </li>
+          <% end %>
+        <% end %>
+      </ol>
+    </nav>
   <% end %>
-</div>
+</header>

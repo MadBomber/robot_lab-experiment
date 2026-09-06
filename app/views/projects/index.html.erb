@@ -1,59 +1,80 @@
-<div class="w-full max-w-2xl">
-  <h1 class="text-2xl font-bold mb-4">Projects</h1>
+<div class="mx-auto w-full max-w-3xl">
+  <header class="flex flex-col gap-4">
+    <div class="flex flex-wrap items-end justify-between gap-4">
+      <div class="space-y-1">
+        <h1 class="text-2xl font-semibold tracking-tight">Projects</h1>
+        <p class="text-sm text-muted-foreground">Git repositories the agent pipeline can run tasks against.</p>
+      </div>
+      <%= poetry_button(href: new_project_path) do |button| %>
+        <% button.with_leading { poetry_icon(name: :plus) } %>
+        New project
+      <% end %>
+    </div>
+    <%= poetry_separator %>
+  </header>
 
-  <ul class="divide-y divide-gray-200 mb-6"
-    id="tp-llm-options"
-    data-options="<%= @llm_options.group_by { |o| o[:provider] }
+  <div class="mt-6"
+    data-controller="llm-options"
+    data-llm-options-options-value="<%= @llm_options.group_by { |o| o[:provider] }
       .transform_values { |opts| opts.map { |o| { value: o[:model], label: o[:label] } } }.to_json %>">
-    <% @projects.each do |project| %>
-      <li class="py-3">
-        <div class="flex items-center justify-between">
-          <%= link_to project.name, project, class: "text-blue-600 hover:underline" %>
-          <span class="text-gray-500 text-sm mr-4"><%= project.repo_folder_path %></span>
-          <div class="flex gap-2">
-            <%= link_to "Edit", edit_project_path(project), class: "text-blue-600 hover:underline text-sm" %>
-            <%= button_to "Delete", project_path(project), method: :delete,
-                  data: { turbo_confirm: "Delete this project and all associated tasks/worktrees?" },
-                  class: "text-red-600 hover:underline text-sm", form_class: "inline" %>
-          </div>
-        </div>
-        <%= form_with url: update_llm_project_path(project), method: :patch,
-              class: "mt-1 flex items-center gap-1" do %>
-          <span class="text-xs text-gray-500">LLM:</span>
-
-          <select name="project[llm_provider]" class="tp-llm-provider text-xs border rounded">
-            <option value="" <%= "selected" if !project.llm_provider? %>>App default</option>
-            <% unless current_llm_provider_listed?(project, @llm_options) %>
-              <option value="<%= project.llm_provider %>" selected>
-                <%= project.llm_provider %> (currently set, not in the live list)
-              </option>
+    <%= poetry_item_group do %>
+      <% @projects.each_with_index do |project, index| %>
+        <%= poetry_item_separator(key: project) if index.positive? %>
+        <%= poetry_item(role: "listitem") do |item| %>
+          <% item.with_title do %>
+            <%= poetry_link(href: project_path(project)) { project.name } %>
+          <% end %>
+          <% item.with_description do %>
+            <span class="font-mono text-xs"><%= project.repo_folder_path %></span>
+          <% end %>
+          <% item.with_actions do %>
+            <%= poetry_button(variant: :outline, size: :sm, href: edit_project_path(project)) { "Edit" } %>
+            <%= form_with url: project_path(project), method: :delete, class: "inline",
+                  data: { turbo_confirm: "Delete this project and all associated tasks/worktrees?" } do %>
+              <%= poetry_button(variant: :destructive, size: :sm, type: :submit) { "Delete" } %>
             <% end %>
-            <% @llm_options.map { |o| o[:provider] }.uniq.each do |provider| %>
-              <option value="<%= provider %>" <%= "selected" if project.llm_provider == provider %>><%= provider %></option>
-            <% end %>
-          </select>
+          <% end %>
+          <% item.with_footer do %>
+            <%= form_with url: update_llm_project_path(project), method: :patch,
+                  class: "flex flex-wrap items-center gap-2" do %>
+              <span class="text-xs text-muted-foreground">LLM:</span>
 
-          <select name="project[llm_model]" class="tp-llm-model text-xs border rounded"
-            <%= "disabled" if !project.llm_provider? %>>
-            <% if !project.llm_provider? %>
-              <option value="">App default (<%= AgentRunner::DEFAULT_PROVIDER %>/<%= AgentRunner::DEFAULT_MODEL %>)</option>
-            <% else %>
-              <% unless current_llm_pair_listed?(project, @llm_options) %>
-                <option value="<%= project.llm_model %>" selected>
-                  <%= project.llm_model %> (currently set, not in the live list)
-                </option>
+              <% provider_options = [["App default", ""]] %>
+              <% unless current_llm_provider_listed?(project, @llm_options) %>
+                <% provider_options << ["#{project.llm_provider} (currently set, not in the live list)", project.llm_provider] %>
               <% end %>
-              <% llm_options_for_provider(project, @llm_options).each do |opt| %>
-                <option value="<%= opt[:model] %>" <%= "selected" if project.llm_model == opt[:model] %>><%= opt[:label] %></option>
-              <% end %>
-            <% end %>
-          </select>
+              <% provider_options += @llm_options.map { |o| o[:provider] }.uniq.map { |p| [p, p] } %>
+              <%= poetry_native_select(name: "project[llm_provider]", size: :sm, label: "LLM provider",
+                    options: provider_options, selected: project.llm_provider.to_s,
+                    data: { action: "change->llm-options#providerChanged" }) %>
 
-          <%= submit_tag "Set", class: "text-xs bg-gray-200 hover:bg-gray-300 px-2 py-1 rounded cursor-pointer" %>
+              <% if project.llm_provider? %>
+                <% model_options = [] %>
+                <% unless current_llm_pair_listed?(project, @llm_options) %>
+                  <% model_options << ["#{project.llm_model} (currently set, not in the live list)", project.llm_model] %>
+                <% end %>
+                <% model_options += llm_options_for_provider(project, @llm_options).map { |o| [o[:label], o[:model]] } %>
+                <%= poetry_native_select(name: "project[llm_model]", size: :sm, label: "LLM model",
+                      options: model_options, selected: project.llm_model.to_s) %>
+              <% else %>
+                <%= poetry_native_select(name: "project[llm_model]", size: :sm, label: "LLM model", disabled: true,
+                      options: [["App default (#{AgentRunner::DEFAULT_PROVIDER}/#{AgentRunner::DEFAULT_MODEL})", ""]]) %>
+              <% end %>
+
+              <%= poetry_button(variant: :secondary, size: :sm, type: :submit) { "Set" } %>
+            <% end %>
+          <% end %>
         <% end %>
-      </li>
+      <% end %>
     <% end %>
-  </ul>
 
-  <%= link_to "New project", new_project_path, class: "inline-block bg-blue-600 text-white px-4 py-2 rounded" %>
+    <% if @projects.empty? %>
+      <%= poetry_empty(media_variant: :icon) do |empty| %>
+        <% empty.with_media { poetry_icon(name: :"folder-git-2") } %>
+        <% empty.with_title { "No projects yet" } %>
+        <% empty.with_description { "Point the pipeline at an existing git checkout to get started." } %>
+        <%= poetry_button(href: new_project_path) { "New project" } %>
+      <% end %>
+    <% end %>
+  </div>
 </div>

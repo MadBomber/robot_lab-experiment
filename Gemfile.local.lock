@@ -251,6 +251,14 @@ GEM
     globalid (1.4.0)
       activesupport (>= 6.1)
     hana (1.3.7)
+    herb (0.10.3-aarch64-linux-gnu)
+    herb (0.10.3-aarch64-linux-musl)
+    herb (0.10.3-arm-linux-gnu)
+    herb (0.10.3-arm-linux-musl)
+    herb (0.10.3-arm64-darwin)
+    herb (0.10.3-x86_64-darwin)
+    herb (0.10.3-x86_64-linux-gnu)
+    herb (0.10.3-x86_64-linux-musl)
     http-2 (1.2.2)
     httpx (1.8.3)
       http-2 (>= 1.2.0)
@@ -342,6 +350,17 @@ GEM
       ast (~> 2.4.1)
       racc
     path_expander (2.0.1)
+    poetry-agent (0.1.0)
+      poetry-core (= 0.1.0)
+    poetry-core (0.1.0)
+      rails (~> 8.0)
+      tailwind_merge (~> 1.3)
+      view_component (~> 4.0)
+      zeitwerk (~> 2.6)
+    poetry-lucide (0.1.0)
+      poetry-core (= 0.1.0)
+    poetry-ui (0.1.0)
+      poetry-core (= 0.1.0)
     pp (0.6.4)
       prettyprint
     prettyprint (0.2.0)
@@ -502,6 +521,7 @@ GEM
     simple_flow (0.4.0)
     simplecov (1.1.1)
     simpleidn (0.3.0)
+    sin_lru_redux (2.5.3)
     smart_properties (1.17.0)
     solid_cable (4.0.2)
       actioncable (>= 7.2)
@@ -529,6 +549,8 @@ GEM
     sqlite3 (2.9.6-x86_64-linux-musl)
     stimulus-rails (1.3.4)
       railties (>= 6.0.0)
+    tailwind_merge (1.5.5)
+      sin_lru_redux (~> 2.5)
     tailwindcss-rails (4.6.0)
       railties (>= 7.0.0)
       tailwindcss-ruby (~> 4.0)
@@ -554,6 +576,10 @@ GEM
     unicode-emoji (4.2.0)
     uri (1.1.1)
     useragent (0.16.11)
+    view_component (4.15.0)
+      actionview (>= 7.1.0)
+      activesupport (>= 7.1.0)
+      concurrent-ruby (~> 1)
     web-console (4.3.0)
       actionview (>= 8.0.0)
       bindex (>= 0.4.0)
@@ -588,10 +614,15 @@ DEPENDENCIES
   fasterer
   flay
   flog
+  herb
   image_processing (~> 2.0)
   importmap-rails
   jbuilder
   minitest-mock
+  poetry-agent
+  poetry-core
+  poetry-lucide
+  poetry-ui
   propshaft
   puma (>= 5.0)
   rails (~> 8.1.3)
@@ -643,6 +674,7 @@ CHECKSUMS
   bootsnap (1.25.0) sha256=41059e7d0f9cb4023a33465d095f64b913fc9d1b808d6524c307da945fbcffcf
   brakeman (8.0.6) sha256=759cc69341115e6c2dcd47b6fd8649a0b9bd540e3585ac8a0a94e31c66fee386
   builder (3.3.0) sha256=497918d2f9dca528fdca4b88d84e4ef4387256d984b8154e9d5d3fe5a9c8835f
+  bundler (4.0.19) sha256=b48056e4c77fb3853cc47775b5447ede44aaa4f53c32f168014ab4fe86587d47
   bundler-audit (0.9.3) sha256=81c8766c71e47d0d28a0f98c7eed028539f21a6ea3cd8f685eb6f42333c9b4e9
   capybara (3.40.0) sha256=42dba720578ea1ca65fd7a41d163dd368502c191804558f6e0f71b391054aeef
   code_analyzer (0.5.5) sha256=c81533e9986259657acb9b3321d831efb1720ef59eed37e7e5dec56ac368e03e
@@ -687,6 +719,14 @@ CHECKSUMS
   fugit (1.13.0) sha256=a4f093fce740da52f216740a5041e2a594ea763cdb89e8b2754ca4399634ab18
   globalid (1.4.0) sha256=037f12fbf1d9d7a014d501c2d5c77356fd4ddd96d7a7991d6700bba96706f427
   hana (1.3.7) sha256=5425db42d651fea08859811c29d20446f16af196308162894db208cac5ce9b0d
+  herb (0.10.3-aarch64-linux-gnu) sha256=1eaea87e6577557492a1b0ddaae989fba8a8ddd382e888ee5f939ce6ded06eb8
+  herb (0.10.3-aarch64-linux-musl) sha256=4ac7ccd194f8f284ffc7bf093676f5194cf0f44ea4a7d3888eac095e81c43e1f
+  herb (0.10.3-arm-linux-gnu) sha256=d5f007b665a705b5566f1068b54e1600d5ffe6cb0b7d274e27dd7ed5918ca54e
+  herb (0.10.3-arm-linux-musl) sha256=09a0979f64ee3aff0b25a345c2cecd15992a0532295fd00249d73f13a3e313b1
+  herb (0.10.3-arm64-darwin) sha256=1a5bef57d925d775496328e7a01a9c1260e1d83bed8038b60a4f8c81b12c15a3
+  herb (0.10.3-x86_64-darwin) sha256=e02e43b3bb1977f4fd08f3330b5f2aa3292ca2d572a8bd59688eca8b79725f46
+  herb (0.10.3-x86_64-linux-gnu) sha256=cbb49b66f2bdc92d17109d1ea9452e88ba6a8ae52e9ddd5279deff83dcc4c66d
+  herb (0.10.3-x86_64-linux-musl) sha256=c84482d6b57f13c2e1a0fa029649efb0e5fdc876a3fd564bae09cf42bd4d5ae1
   http-2 (1.2.2) sha256=81b5d45f50fd4cd5f8c5d09651184bec9401e3ef169c3eb3e5b003d5614a92b9
   httpx (1.8.3) sha256=cb88f2285c4ef17164d803a640dc393d28722cba7f282ad0e7f9f926cd02dc47
   i18n (1.15.2) sha256=00f9eb62412fe593b2a65a97daa75300d37abb8f7202ec748e94b6d46a9dd1b5
@@ -733,6 +773,10 @@ CHECKSUMS
   parallel (2.1.0) sha256=b35258865c2e31134c5ecb708beaaf6772adf9d5efae28e93e99260877b09356
   parser (3.3.12.0) sha256=21a6d7f755d5a24dfbdc6e6b772e4e879a52e7631a88bc5a3a134606052c9828
   path_expander (2.0.1) sha256=2de201164bff4719cc4d0b3767286e9977cc832a59c4d70abab571ec86cb41e4
+  poetry-agent (0.1.0) sha256=116c7051a851c8b413beea157c11639fc8e78208745f0769347a7de2ebff37db
+  poetry-core (0.1.0) sha256=1d830ba1253357fb790bb0fb1e014672beaa7dcde43ef408acaf8ab1f39d9612
+  poetry-lucide (0.1.0) sha256=192ed84aaa8fbbc7b0abd24db512a4783e6c7ef8c8cd437afc254e5f1dfe29c1
+  poetry-ui (0.1.0) sha256=90cd4170c160159cbe2b35feb88d3eac2f7cd01ad869d107929971fd38ac782f
   pp (0.6.4) sha256=dfcb0fce700c41456265922884f9fe195d7fbb0674a3578e6c0f69588e82b570
   prettyprint (0.2.0) sha256=2bc9e15581a94742064a3cc8b0fb9d45aae3d03a1baa6ef80922627a0766f193
   prism (1.9.0) sha256=7b530c6a9f92c24300014919c9dcbc055bf4cdf51ec30aed099b06cd6674ef85
@@ -789,6 +833,7 @@ CHECKSUMS
   simple_flow (0.4.0) sha256=20690b39bd0895ff6085b7011454d38d80bb4602518aaf23ace714c5dfc55bcd
   simplecov (1.1.1) sha256=25825ef13f0b2e74694d769817dad6ab8e90131dabdaa666e522fea105521e78
   simpleidn (0.3.0) sha256=12ca730bed2f3db04d11e9bfd1bca3e11fb37f55b21eb2e9793fb5814bf54d03
+  sin_lru_redux (2.5.3) sha256=d9bcc184537cb0781cccfb283a18d36c5b820cf811b2637b398b55e98f4cecbd
   smart_properties (1.17.0) sha256=f9323f8122e932341756ddec8e0ac9ec6e238408a7661508be99439ca6d6384b
   solid_cable (4.0.2) sha256=084636a67679ad00d23088b33c84047e614bcf41ee559db24b414d83cdc42d03
   solid_cache (1.0.10) sha256=bc05a2fb3ac78a6f43cbb5946679cf9db67dd30d22939ededc385cb93e120d41
@@ -802,6 +847,7 @@ CHECKSUMS
   sqlite3 (2.9.6-x86_64-linux-gnu) sha256=613188ce02f614126ddbc38c5e217ccffd6306d0dcd9adca9764547aa890a634
   sqlite3 (2.9.6-x86_64-linux-musl) sha256=d493b11818a3573387a1d56e1ee8fa00da23a683a7a1cc063e7a0feeed843abf
   stimulus-rails (1.3.4) sha256=765676ffa1f33af64ce026d26b48e8ffb2e0b94e0f50e9119e11d6107d67cb06
+  tailwind_merge (1.5.5) sha256=391b93d11acdce3e04e2cff8059d300d1857ea9f3b997b91e06caa9120915b1e
   tailwindcss-rails (4.6.0) sha256=d99512867173d55c5ef8890427682299d8539f550cec1408b3d8667a538bd365
   tailwindcss-ruby (4.3.3) sha256=ee0a64030749862deb501acab4c4aaf5adbee13865746a33299d46d7b5d0952a
   tailwindcss-ruby (4.3.3-aarch64-linux-gnu) sha256=c86d6dd3eccc85fe0d792a832b06f2bf3c0a7a83b399308aeb9d8f5725f42a6a
@@ -820,6 +866,7 @@ CHECKSUMS
   unicode-emoji (4.2.0) sha256=519e69150f75652e40bf736106cfbc8f0f73aa3fb6a65afe62fefa7f80b0f80f
   uri (1.1.1) sha256=379fa58d27ffb1387eaada68c749d1426738bd0f654d812fcc07e7568f5c57c6
   useragent (0.16.11) sha256=700e6413ad4bb954bb63547fa098dddf7b0ebe75b40cc6f93b8d54255b173844
+  view_component (4.15.0) sha256=2924e207b102c04ab51c4d318535f03f1c3aab3c81ecff99b1cc631b43e14eac
   web-console (4.3.0) sha256=e13b71301cdfc2093f155b5aa3a622db80b4672d1f2f713119cc7ec7ac6a6da4
   websocket (1.2.11) sha256=b7e7a74e2410b5e85c25858b26b3322f29161e300935f70a0e0d3c35e0462737
   websocket-driver (0.8.2) sha256=97c556b019bf3410b4961002ac501621e9322d3f8a7bc02161a09301cc4c4146

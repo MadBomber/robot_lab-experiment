@@ -8,6 +8,7 @@
     <meta name="mobile-web-app-capable" content="yes">
     <%= csrf_meta_tags %>
     <%= csp_meta_tag %>
+    <%= poetry_color_scheme_script %>
 
     <%= yield :head %>
 
@@ -23,12 +24,29 @@
     <%= javascript_importmap_tags %>
   </head>
 
-  <body>
+  <body class="min-h-screen bg-background text-foreground antialiased">
     <header class="container mx-auto px-5 pt-6">
-      <%= link_to "Robot Lab Experiment", root_path, class: "text-sm text-gray-500 hover:underline" %>
+      <%= poetry_link(href: root_path, class: "text-sm text-muted-foreground") { "Robot Lab Experiment" } %>
     </header>
 
-    <main class="container mx-auto mt-28 px-5 flex">
+    <main class="container mx-auto mt-10 px-5 pb-12">
+      <% if flash[:alert].present? || flash[:notice].present? %>
+        <div class="mx-auto mb-6 max-w-2xl space-y-2">
+          <% if flash[:alert].present? %>
+            <%= poetry_alert(variant: :destructive) do |alert| %>
+              <% alert.with_icon(name: :"triangle-alert") %>
+              <%= flash[:alert] %>
+            <% end %>
+          <% end %>
+          <% if flash[:notice].present? %>
+            <%= poetry_alert do |alert| %>
+              <% alert.with_icon(name: :info) %>
+              <%= flash[:notice] %>
+            <% end %>
+          <% end %>
+        </div>
+      <% end %>
+
       <%= yield %>
     </main>
   </body>

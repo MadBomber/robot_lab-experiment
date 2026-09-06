@@ -1,28 +1,22 @@
-<% content_for(:head) do %>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
-<% end %>
-
-<div class="tp-page">
+<div class="w-full">
   <%= render "task_header", task: @task, project: @project %>
 
-  <div class="tp-layout">
+  <div class="mt-5 grid items-start gap-5 lg:grid-cols-[18rem_minmax(0,1fr)]">
     <%= render "task_controls", task: @task, project: @project, doc_content: @doc_content %>
 
-    <main class="min-w-0">
-      <div class="tp-toolbar">
-        <span class="tp-eyebrow">Transcript</span>
-        <label class="tp-check">
-          <input type="checkbox" id="tp-collapse-toggle">
-          Collapse tool calls
-        </label>
+    <section class="min-w-0" data-controller="transcript">
+      <div class="mb-3 flex items-center justify-between">
+        <span class="font-mono text-xs uppercase tracking-widest text-muted-foreground">Transcript</span>
+        <%= poetry_toggle(variant: :outline, size: :sm,
+              data: { action: "poetry:toggle:change->transcript#syncCollapsed" }) { "Collapse tool calls" } %>
       </div>
 
       <%= turbo_stream_from "task_#{@task.id}" %>
-      <div id="transcript" class="tp-transcript">
+      <%= poetry_message_scroller(id: "transcript", class: "h-[70vh]") do %>
         <%= render partial: "messages/message", collection: @messages, as: :message %>
-      </div>
+      <% end %>
 
       <%= render "tasks/agent_status", running: @task.running_agent_run.present?, task: @task %>
-    </main>
+    </section>
   </div>
 </div>

@@ -1,29 +1,16 @@
-<style>
-  @keyframes heartbeat-pulse {
-    0%   { box-shadow: 0 0 0 0px rgba(34, 197, 94, 0.5); }
-    70%  { box-shadow: 0 0 0 12px rgba(34, 197, 94, 0); }
-    100% { box-shadow: 0 0 0 0px rgba(34, 197, 94, 0); }
-  }
-
-  .heartbeat-icon {
-    position: relative;
-    transition: box-shadow 0.3s ease;
-    display: inline-block;
-  }
-
-  .heartbeat-pulse-active {
-    animation: heartbeat-pulse 1.5s ease-out;
-  }
-</style>
-
-<div id="agent-status"<% if running && task %> data-heartbeat-url="<%= heartbeat_project_task_path(task.project_id, task) %>"<% end %>>
+<div id="agent-status">
   <% if running %>
-    <div class="tp-now">
-      <svg class="animate-spin h-4 w-4 heartbeat-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" style="color: var(--tp-accent);">
-        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-      </svg>
-      Agent working &middot; <span data-elapsed>...</span> &middot; <span data-msg-count>0</span> messages
+    <div class="mt-3 flex items-center gap-3 rounded-lg border border-dashed border-border px-4 py-3 text-sm text-muted-foreground"
+      <% if task %>
+        data-controller="heartbeat"
+        data-heartbeat-url-value="<%= heartbeat_project_task_path(task.project_id, task) %>"
+      <% end %>>
+      <%= poetry_spinner(label: "Agent working", class: "size-4 text-primary") %>
+      <span>
+        Agent working &middot;
+        <span class="font-mono tabular-nums" data-heartbeat-target="elapsed">...</span> &middot;
+        <span class="font-mono tabular-nums" data-heartbeat-target="count">0</span> messages
+      </span>
     </div>
   <% end %>
 </div>

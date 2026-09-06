@@ -1,34 +1,21 @@
-<div class="w-full max-w-lg">
-  <h1 class="text-2xl font-bold mb-4">Edit project</h1>
+<div class="mx-auto w-full max-w-lg">
+  <h1 class="mb-6 text-2xl font-semibold tracking-tight">Edit project</h1>
 
-  <% if @project.errors.any? %>
-    <div class="bg-red-50 text-red-700 p-3 rounded mb-4">
-      <ul>
-        <% @project.errors.full_messages.each do |message| %>
-          <li><%= message %></li>
-        <% end %>
-      </ul>
-    </div>
+  <%= form_with model: @project, builder: Poetry::Ui::FormBuilder do |f| %>
+    <%= poetry_field_group do %>
+      <%= f.input :name %>
+      <%= f.input :subproject_path, label: "Subproject path",
+            hint: "Optional, for monorepos." %>
+      <%= f.input :repo_folder_path, label: "Repository path",
+            disabled: @project.tasks.any?,
+            hint: @project.tasks.any? ? "Changing this field is blocked because the project has existing tasks." : "An existing git checkout on this machine." %>
+      <%= f.submit "Save changes" %>
+    <% end %>
   <% end %>
 
-  <%= form_with model: @project, class: "space-y-4" do |f| %>
-    <div>
-      <%= f.label :name, class: "block font-medium" %>
-      <%= f.text_field :name, class: "border rounded w-full p-2" %>
-    </div>
-    <div>
-      <%= f.label :subproject_path, "Subproject path (optional, for monorepos)", class: "block font-medium" %>
-      <%= f.text_field :subproject_path, class: "border rounded w-full p-2" %>
-    </div>
-    <div>
-      <%= f.label :repo_folder_path, "Repository path (an existing git checkout)", class: "block font-medium" %>
-      <%= f.text_field :repo_folder_path, class: "border rounded w-full p-2 bg-gray-50", disabled: @project.tasks.any? %>
-      <% if @project.tasks.any? %>
-        <p class="text-xs text-amber-600 mt-1">Changing this field is blocked because the project has existing tasks.</p>
-      <% end %>
-    </div>
-    <%= f.submit "Save changes", class: "bg-blue-600 text-white px-4 py-2 rounded" %>
-  <% end %>
-
-  <p class="mt-4"><%= link_to "← Back to project", @project, class: "text-blue-600 hover:underline" %></p>
+  <p class="mt-6">
+    <%= poetry_link(href: project_path(@project), class: "inline-flex items-center gap-1 text-sm") do %>
+      <%= poetry_icon(name: :"arrow-left", class: "size-3.5") %> Back to project
+    <% end %>
+  </p>
 </div>

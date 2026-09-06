@@ -16,6 +16,11 @@ gem "turbo-rails"
 gem "stimulus-rails"
 # Use Tailwind CSS [https://github.com/rails/tailwindcss-rails]
 gem "tailwindcss-rails"
+# Poetry UI: Rails-first component library [https://poetryui.com]
+gem "poetry-agent"
+gem "poetry-core"
+gem "poetry-lucide"
+gem "poetry-ui"
 # Build JSON APIs with ease [https://github.com/rails/jbuilder]
 gem "jbuilder"
 
@@ -47,6 +52,9 @@ group :development, :test do
 
   # Bundle audit that checks for CVEs in gem dependencies [https://github.com/rubysec/bundler-audit]
   gem "bundler-audit", require: false
+
+  # Poetry's ERB contract linter (bin/rails poetry:check)
+  gem "herb", require: false
 
   # Code complexity, structural duplication, and code smell checks (asgard quality)
   gem "active_record_doctor"
