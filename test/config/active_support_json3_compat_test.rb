@@ -18,6 +18,19 @@ class ActiveSupportJson3CompatTest < ActiveSupport::TestCase
     assert_equal({ team: "rails" }, ActiveSupport::JSON.decode(%({"team":"rails"}), symbolize_names: true))
   end
 
+  # ActiveRecord::Coders::JSON#load passes { escape: false } -- an
+  # encoder-only option json 2.x ignored but json 3 rejects as an unknown
+  # keyword. The backport must slice it away or every serialized-attribute
+  # load (e.g. Solid Queue registering its worker process) crashes at boot.
+  test "decode ignores encoder-only options the way json 2.x did" do
+    assert_equal({ "team" => "rails" }, ActiveSupport::JSON.decode(%({"team":"rails"}), escape: false))
+  end
+
+  test "decode with mixed options keeps the parse options and drops the rest" do
+    assert_equal({ team: "rails" },
+                 ActiveSupport::JSON.decode(%({"team":"rails"}), escape: false, symbolize_names: true))
+  end
+
   test "load stays aliased to decode" do
     assert_equal [1, 2], ActiveSupport::JSON.load("[1,2]")
   end
