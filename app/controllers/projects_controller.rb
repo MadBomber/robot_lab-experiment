@@ -22,6 +22,12 @@ class ProjectsController < ApplicationController
     @project = Project.find(params[:id])
     @tasks = project.tasks.order(created_at: :desc)
     @open_issues = GithubIssueService.list(project)
+    # Issue number -> the most recent task created from that issue (tasks are
+    # newest-first), so the issues list can show pipeline status instead of
+    # offering to create a duplicate task.
+    @task_by_issue_number = tasks.reject { |t| t.github_issue_number.nil? }
+                                 .uniq(&:github_issue_number)
+                                 .index_by(&:github_issue_number)
   end
 
   def edit
@@ -77,10 +83,10 @@ class ProjectsController < ApplicationController
 
   private
 
-  # The actions assign @project for the views; controller code reads it back
-  # through this reader so the class doesn't touch bare ivars outside the
-  # assigning action (reek: InstanceVariableAssumption).
-  attr_reader :project
+  # The actions assign @project/@tasks for the views; controller code reads
+  # them back through these readers so the class doesn't touch bare ivars
+  # outside the assigning action (reek: InstanceVariableAssumption).
+  attr_reader :project, :tasks
 
   def project_params
     params.expect(project: %i[name repo_folder_path subproject_path])

@@ -13,7 +13,8 @@ class TasksController < ApplicationController
 
     task = TaskCreationService.new(
       project,
-      attributes: { title:, description: },
+      attributes: { title:, description:,
+                    github_issue_number: task_params[:github_issue_number].presence },
       original_request: description.presence || title
     ).call
 
@@ -126,13 +127,15 @@ class TasksController < ApplicationController
   end
 
   # The unsaved Task the :new form re-renders after creation fails, carrying
-  # the failure message.
+  # the failure message (and the issue linkage, so a retry keeps it).
   def failed_new_task(title, description, message)
-    project.tasks.new(title:, description:).tap { |t| t.errors.add(:base, message) }
+    project.tasks.new(title:, description:,
+                      github_issue_number: task_params[:github_issue_number].presence)
+           .tap { |t| t.errors.add(:base, message) }
   end
 
   def task_params
-    params.expect(task: %i[title description])
+    params.expect(task: %i[title description github_issue_number])
   end
 
   def delete_task!(task)
@@ -165,5 +168,6 @@ class TasksController < ApplicationController
 
     task.title = issue.title
     task.description = "#{issue.thread_text}\n\n(from #{issue.url})"
+    task.github_issue_number = issue.number
   end
 end

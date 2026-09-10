@@ -55,6 +55,37 @@ class ProjectsControllerTest < ActionDispatch::IntegrationTest
     assert_select "a[href=?]", new_project_task_path(project, from_issue: 5), text: "Create task"
   end
 
+  test "show replaces the create-task link with status and a task link once an issue has a task" do
+    project = Project.create!(name: "Demo", repo_folder_path: @repo_dir)
+    task = Task.create!(project:, title: "Fix the thing", status: "in_progress", github_issue_number: 5)
+    issue = GithubIssueService::Issue.new(number: 5, title: "Fix the thing", body: nil,
+                                          url: "https://github.com/x/y/issues/5")
+
+    GithubIssueService.stub(:list, ->(*_args) { [issue] }) do
+      get project_url(project)
+    end
+
+    assert_response :success
+    assert_select "a[href=?]", new_project_task_path(project, from_issue: 5), count: 0
+    assert_select "a[href=?]", project_task_path(project, task), text: "View task"
+  end
+
+  test "show links the most recent task when several were created from the same issue" do
+    project = Project.create!(name: "Demo", repo_folder_path: @repo_dir)
+    Task.create!(project:, title: "First try", status: "completed", github_issue_number: 5,
+                 created_at: 1.day.ago)
+    newest = Task.create!(project:, title: "Second try", status: "in_progress", github_issue_number: 5)
+    issue = GithubIssueService::Issue.new(number: 5, title: "Fix the thing", body: nil,
+                                          url: "https://github.com/x/y/issues/5")
+
+    GithubIssueService.stub(:list, ->(*_args) { [issue] }) do
+      get project_url(project)
+    end
+
+    assert_response :success
+    assert_select "a[href=?]", project_task_path(project, newest), text: "View task"
+  end
+
   test "show shows a Clear completed tasks button only when a task is completed" do
     project = Project.create!(name: "Demo", repo_folder_path: @repo_dir)
     Task.create!(project:, title: "Not done yet")

@@ -55,13 +55,20 @@
       <%= poetry_item_group do %>
         <% @open_issues.each_with_index do |issue, index| %>
           <%= poetry_item_separator(key: issue.number) if index.positive? %>
+          <% issue_task = @task_by_issue_number[issue.number] %>
           <%= poetry_item(size: :sm, role: "listitem") do |item| %>
             <% item.with_title do %>
               <%= poetry_link(href: issue.url, external: true) { "##{issue.number} #{issue.title}" } %>
             <% end %>
             <% item.with_actions do %>
-              <%= poetry_button(variant: :outline, size: :sm,
-                    href: new_project_task_path(@project, from_issue: issue.number)) { "Create task" } %>
+              <% if issue_task %>
+                <%= poetry_badge(variant: task_status_badge_variant(issue_task.status)) { issue_task.status.humanize } %>
+                <%= poetry_button(variant: :outline, size: :sm,
+                      href: project_task_path(@project, issue_task)) { "View task" } %>
+              <% else %>
+                <%= poetry_button(variant: :outline, size: :sm,
+                      href: new_project_task_path(@project, from_issue: issue.number)) { "Create task" } %>
+              <% end %>
             <% end %>
           <% end %>
         <% end %>

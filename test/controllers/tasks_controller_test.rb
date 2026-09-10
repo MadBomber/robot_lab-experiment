@@ -47,11 +47,13 @@ class TasksControllerTest < ActionDispatch::IntegrationTest
     previous_env = ENV.fetch("ROBOT_LAB_EXPERIMENT_ARCHIVE_ROOT", nil)
     ENV["ROBOT_LAB_EXPERIMENT_ARCHIVE_ROOT"] = archive_root
 
-    post project_tasks_url(@project), params: { task: { title: "Add login", description: "Please add a login page" } }
+    post project_tasks_url(@project),
+         params: { task: { title: "Add login", description: "Please add a login page", github_issue_number: "5" } }
 
     task = @project.tasks.sole
     assert_redirected_to project_task_url(@project, task)
     assert_equal "Please add a login page", TaskDocument.read(task)
+    assert_equal 5, task.github_issue_number
     assert Dir.exist?(task.worktree_path)
   ensure
     ENV["ROBOT_LAB_EXPERIMENT_ARCHIVE_ROOT"] = previous_env
@@ -100,6 +102,7 @@ class TasksControllerTest < ActionDispatch::IntegrationTest
     assert_select "textarea#task_description", text: /Steps to reproduce.../
     assert_select "textarea#task_description", text: /Comment from reviewer/
     assert_select "textarea#task_description", text: /Confirmed -- fix the validator\./
+    assert_select "input[type=hidden][name='task[github_issue_number]'][value='5']"
   end
 
   test "new renders a blank form when the from_issue lookup fails" do

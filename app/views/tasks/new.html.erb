@@ -15,6 +15,10 @@
   <%= form_with model: @task, url: project_tasks_path(@project),
         builder: Poetry::Ui::FormBuilder, class: "mt-6" do |f| %>
     <%= poetry_field_group do %>
+      <%# Carries the issue linkage from the from_issue prefill through the
+          POST, so the project page can show the task's status on that issue
+          row instead of another "Create task" button. %>
+      <%= f.hidden_field :github_issue_number %>
       <%= f.input :title %>
       <%= f.input :description, as: :text, rows: 6, label: "Describe the work",
             hint: "Becomes the task doc's original request." %>
