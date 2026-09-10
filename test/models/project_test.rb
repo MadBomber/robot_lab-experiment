@@ -3,16 +3,34 @@ require "test_helper"
 class ProjectTest < ActiveSupport::TestCase
   def setup
     @repo_dir = Dir.mktmpdir("project_test_repo")
-    Dir.chdir(@repo_dir) { system("git", "init", "--quiet") }
+    Dir.chdir(@repo_dir) do
+      system("git", "init", "--quiet")
+      system("git", "config", "user.email", "test@example.com")
+      system("git", "config", "user.name", "Test User")
+      File.write("README.md", "hello")
+      system("git", "add", ".")
+      system("git", "commit", "-m", "initial", "--quiet")
+    end
   end
 
   def teardown
-    FileUtils.remove_entry(@repo_dir)
+    FileUtils.remove_entry(@repo_dir, true)
   end
 
   test "valid with a real git repo path" do
     project = Project.new(name: "Demo", repo_folder_path: @repo_dir)
     assert project.valid?
+  end
+
+  test "valid with a git worktree path" do
+    worktree_dir = Dir.mktmpdir("project_test_worktree")
+    system("git", "-C", @repo_dir, "worktree", "add", "--quiet", worktree_dir)
+
+    project = Project.new(name: "Worktree Demo", repo_folder_path: worktree_dir)
+    assert project.valid?, project.errors.full_messages
+  ensure
+    system("git", "-C", @repo_dir, "worktree", "remove", "--force", worktree_dir) if worktree_dir
+    FileUtils.remove_entry(worktree_dir) if worktree_dir && Dir.exist?(worktree_dir)
   end
 
   test "invalid when repo_folder_path is not a git repo" do

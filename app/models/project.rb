@@ -42,7 +42,8 @@ class Project < ApplicationRecord
 
   def repo_folder_path_must_be_a_git_repo
     return if repo_folder_path.blank?
-    return if Dir.exist?(File.join(repo_folder_path, ".git"))
+    return if system("git", "-C", repo_folder_path, "rev-parse", "--is-inside-work-tree",
+                     out: File::NULL, err: File::NULL)
 
     errors.add(:repo_folder_path, "is not a git repository")
   end
