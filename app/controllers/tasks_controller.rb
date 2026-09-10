@@ -3,7 +3,7 @@ class TasksController < ApplicationController
   before_action :set_task, only: %i[show destroy unblock pause stop abandon guide update_status heartbeat]
 
   def new
-    @task = @project.tasks.new
+    @task = project.tasks.new
     prefill_from_issue(params[:from_issue])
   end
 
@@ -12,32 +12,31 @@ class TasksController < ApplicationController
     description = task_params[:description]
 
     task = TaskCreationService.new(
-      @project,
+      project,
       attributes: { title:, description: },
       original_request: description.presence || title
     ).call
 
-    redirect_to [@project, task], notice: "Task created."
+    redirect_to [project, task], notice: "Task created."
   rescue TaskCreationService::Error => e
-    @task = @project.tasks.new(title:, description:)
-    @task.errors.add(:base, e.message)
+    @task = failed_new_task(title, description, e.message)
     render :new, status: :unprocessable_entity
   end
 
   def show
-    @doc_content = TaskDocument.read(@task)
-    @messages = Message.where(conversation_id: @task.conversation_ids).order(:created_at, :seq)
+    @doc_content = TaskDocument.read(task)
+    @messages = Message.where(conversation_id: task.conversation_ids).order(:created_at, :seq)
   end
 
   def destroy
-    delete_task!(@task)
-    redirect_to @project, notice: "Task '#{@task.title}' deleted."
+    delete_task!(task)
+    redirect_to project, notice: "Task '#{task.title}' deleted."
   rescue => e
-    redirect_to @project, alert: "Could not delete task: #{e.message}"
+    redirect_to project, alert: "Could not delete task: #{e.message}"
   end
 
   def clear_completed
-    tasks = @project.tasks.completed.to_a
+    tasks = project.tasks.completed.to_a
     # One task that fails to tear down (e.g. a stuck worktree, now that
     # WorktreeService#remove surfaces those) must not abort the whole sweep.
     failed = tasks.reject { |task| destroy_task(task) }
@@ -45,45 +44,45 @@ class TasksController < ApplicationController
 
     notice = "Cleared #{cleared} completed #{'task'.pluralize(cleared)}."
     notice += " #{failed.size} could not be deleted." if failed.any?
-    redirect_to @project, notice:
+    redirect_to project, notice:
   end
 
   def unblock
-    @task.unblock!
-    redirect_to [@project, @task], notice: "Task resumed."
+    task.unblock!
+    redirect_to [project, task], notice: "Task resumed."
   end
 
   # Stop auto-chaining but let the current run finish naturally.
   def pause
-    @task.update!(
+    task.update!(
       blocked_reason: "human_requested",
       blocked_detail: "paused by a human at #{Time.current.utc.iso8601}"
     )
-    redirect_to [@project, @task], notice: "Task paused -- it won't start another run."
+    redirect_to [project, task], notice: "Task paused -- it won't start another run."
   end
 
   # Halt the in-flight run now (cooperative cancel) and pause the pipeline.
   def stop
-    run = @task.running_agent_run
+    run = task.running_agent_run
     request_cancel(run)
-    @task.update!(
+    task.update!(
       blocked_reason: "human_requested",
       blocked_detail: "stopped by a human at #{Time.current.utc.iso8601}",
       blocked_run_id: run&.id
     )
-    redirect_to [@project, @task], notice: "Stopping the current run."
+    redirect_to [project, task], notice: "Stopping the current run."
   end
 
   # Give up on the task: halt any in-flight run and mark it abandoned.
   def abandon
-    run = @task.running_agent_run
+    run = task.running_agent_run
     request_cancel(run)
-    @task.update!(
+    task.update!(
       blocked_reason: "abandoned",
       blocked_detail: "abandoned by a human at #{Time.current.utc.iso8601}",
       blocked_run_id: run&.id
     )
-    redirect_to [@project, @task], notice: "Task abandoned."
+    redirect_to [project, task], notice: "Task abandoned."
   end
 
   # Human-in-the-loop redirect (#23): queue guidance for the task's next run and
@@ -92,27 +91,27 @@ class TasksController < ApplicationController
   def guide
     guidance = params[:guidance].to_s.strip
     if guidance.blank?
-      redirect_to [@project, @task], alert: "Guidance can't be blank."
+      redirect_to [project, task], alert: "Guidance can't be blank."
       return
     end
 
-    @task.update!(pending_guidance: guidance)
-    TaskDocument.append_guidance(@task, guidance)
-    redirect_to [@project, @task], notice: "Guidance saved -- it will steer the next run."
+    task.update!(pending_guidance: guidance)
+    TaskDocument.append_guidance(task, guidance)
+    redirect_to [project, task], notice: "Guidance saved -- it will steer the next run."
   end
 
   # Manual escape hatch: the normal status is derived automatically from
   # pipeline flags (see Task#recompute_status!), but a human sometimes needs
   # to override it directly -- e.g. abandoning a task outside the pipeline.
   def update_status
-    @task.update!(status: params.require(:status))
-    redirect_to [@project, @task], notice: "Task status set to #{@task.status}."
+    task.update!(status: params.require(:status))
+    redirect_to [project, task], notice: "Task status set to #{task.status}."
   rescue ArgumentError
-    redirect_to [@project, @task], alert: "'#{params[:status]}' is not a valid status."
+    redirect_to [project, task], alert: "'#{params[:status]}' is not a valid status."
   end
 
   def heartbeat
-    conversation = @task.conversations.order(created_at: :desc).first
+    conversation = task.conversations.order(created_at: :desc).first
     if conversation
       last_msg = conversation.messages.maximum(:created_at)
       render json: {
@@ -127,12 +126,23 @@ class TasksController < ApplicationController
 
   private
 
+  # set_project / set_task (and new/create) assign the ivars for the views;
+  # controller code reads them back through these readers so the class doesn't
+  # touch bare ivars outside the assigning method (reek: InstanceVariableAssumption).
+  attr_reader :project, :task
+
   def set_project
     @project = Project.find(params[:project_id])
   end
 
   def set_task
-    @task = @project.tasks.find(params[:id])
+    @task = project.tasks.find(params[:id])
+  end
+
+  # The unsaved Task the :new form re-renders after creation fails, carrying
+  # the failure message.
+  def failed_new_task(title, description, message)
+    project.tasks.new(title:, description:).tap { |t| t.errors.add(:base, message) }
   end
 
   def task_params
@@ -164,10 +174,10 @@ class TasksController < ApplicationController
   def prefill_from_issue(number)
     return if number.blank?
 
-    issue = GithubIssueService.find(@project, number)
+    issue = GithubIssueService.find(project, number)
     return unless issue
 
-    @task.title = issue.title
-    @task.description = "#{issue.body}\n\n(from #{issue.url})"
+    task.title = issue.title
+    task.description = "#{issue.body}\n\n(from #{issue.url})"
   end
 end

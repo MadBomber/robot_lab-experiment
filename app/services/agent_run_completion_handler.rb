@@ -20,26 +20,34 @@ class AgentRunCompletionHandler
     return no_chain_with_broadcast(:failed_no_chain) if @agent_run.failed?
     return no_chain_with_broadcast(:stopped_after_planning) if @agent_run.planning?
     return no_chain_with_broadcast(:stopped_after_audit) if @agent_run.audit?
-
-    if @task.workflow_complete?
-      return no_chain_with_broadcast(:already_complete) if @task.pr_agent_complete?
-      return start_with_broadcast(:pr, :started_pr)
-    end
-
+    return pr_stage_result if @task.workflow_complete?
     return no_chain_with_broadcast(:stopped_blocked) if @task.blocked?
 
-    if @task.iteration_cap_reached?
-      detail = "reached the #{Task::MAX_WORKFLOW_RUNS}-run workflow cap"
-      @task.update!(blocked_reason: "max_iterations", blocked_detail: detail, blocked_run_id: @agent_run.id)
-      return no_chain_with_broadcast(:blocked_max_iterations)
-    end
+    stop_if_capped || stop_if_plateaued || chain_next_workflow_run
+  end
 
-    # Cross-run plateau: if the task's progress fingerprint hasn't moved for
-    # several cycles, the impl<->review loop is oscillating without progress --
-    # block now rather than grinding to the iteration cap.
-    plateau = stop_if_plateaued
-    return plateau if plateau
+  private
 
+  # Review has signed off: run the PR agent once, then the task is done.
+  def pr_stage_result
+    return no_chain_with_broadcast(:already_complete) if @task.pr_agent_complete?
+
+    start_with_broadcast(:pr, :started_pr)
+  end
+
+  # Blocks the task with the no-chain Result once it hits the workflow-run
+  # cap; nil otherwise so the caller continues.
+  def stop_if_capped
+    return unless @task.iteration_cap_reached?
+
+    detail = "reached the #{Task::MAX_WORKFLOW_RUNS}-run workflow cap"
+    @task.update!(blocked_reason: "max_iterations", blocked_detail: detail, blocked_run_id: @agent_run.id)
+    no_chain_with_broadcast(:blocked_max_iterations)
+  end
+
+  # The impl<->review alternation: whichever of the two just ran, start the
+  # other.
+  def chain_next_workflow_run
     next_type = @agent_run.implementation? ? :review : :implementation
     start_with_broadcast(
       next_type,
@@ -47,10 +55,11 @@ class AgentRunCompletionHandler
     )
   end
 
-  private
-
-  # Records this cycle's progress and, if the task has plateaued, blocks it and
-  # returns the no-chain Result; otherwise returns nil so the caller continues.
+  # Cross-run plateau: if the task's progress fingerprint hasn't moved for
+  # several cycles, the impl<->review loop is oscillating without progress --
+  # block now rather than grinding to the iteration cap. Records this cycle's
+  # progress and, if the task has plateaued, blocks it and returns the
+  # no-chain Result; otherwise returns nil so the caller continues.
   def stop_if_plateaued
     @task.record_progress!(ProgressFingerprint.for(@task))
     return unless @task.plateaued?

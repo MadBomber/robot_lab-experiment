@@ -9,6 +9,6 @@ module TasksHelper
   }.freeze
 
   def task_status_badge_variant(status)
-    STATUS_BADGE_VARIANTS.fetch(status.to_s, :outline)
+    STATUS_BADGE_VARIANTS[status.to_s] || :outline
   end
 end

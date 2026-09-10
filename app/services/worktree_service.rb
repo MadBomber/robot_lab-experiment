@@ -27,9 +27,10 @@ class WorktreeService
   def remove
     return unless @task.worktree_path?
 
-    _out, err, status = run("git", "worktree", "remove", "--force", @task.worktree_path, chdir: @project.repo_folder_path)
+    path = @task.worktree_path
+    _out, err, status = run("git", "worktree", "remove", "--force", path, chdir: @project.repo_folder_path)
     # git errors if the worktree is already gone -- that's a no-op success for us.
-    if !status.success? && Dir.exist?(@task.worktree_path)
+    if !status.success? && Dir.exist?(path)
       # A real failure that leaves the directory behind (permissions, locked
       # files, corrupt state) must surface, not be swallowed into a false success.
       raise Error, "git worktree remove failed: #{err.strip}" unless err.include?("is not a working tree")
@@ -38,7 +39,7 @@ class WorktreeService
       # pruned separately, or the .git/worktrees/<name> entry is otherwise
       # gone) -- there's nothing left for git to manage, so remove the
       # orphaned directory ourselves rather than leaving it stuck forever.
-      FileUtils.rm_rf(@task.worktree_path)
+      FileUtils.rm_rf(path)
     end
 
     # Branch deletion stays best-effort: a missing branch (already deleted, or
@@ -61,14 +62,19 @@ class WorktreeService
   end
 
   def default_branch
-    out, _err, status = Open3.capture3("git", "symbolic-ref", "--short", "refs/remotes/origin/HEAD",
-                                       chdir: @project.repo_folder_path)
-    return out.strip.sub(%r{\Aorigin/}, "") if status.success? && out.present?
+    remote_head = symbolic_ref("refs/remotes/origin/HEAD")
+    return remote_head.sub(%r{\Aorigin/}, "") if remote_head
 
-    out, _err, status = Open3.capture3("git", "symbolic-ref", "--short", "HEAD", chdir: @project.repo_folder_path)
-    return out.strip if status.success? && out.present?
+    symbolic_ref("HEAD") || "main"
+  end
 
-    "main"
+  # The short name `git symbolic-ref` resolves for ref, or nil when the ref
+  # doesn't resolve (e.g. no origin/HEAD in a local-only repo).
+  def symbolic_ref(ref)
+    out, _err, status = Open3.capture3("git", "symbolic-ref", "--short", ref, chdir: @project.repo_folder_path)
+    return unless status.success?
+
+    out.strip.presence
   end
 
   def run!(*argv, chdir:)

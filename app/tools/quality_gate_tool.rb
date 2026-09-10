@@ -52,14 +52,10 @@ class QualityGateTool < CodingTool
 
   def execute
     bundled = bundled_gems
-    rails = rails_app?(bundled)
+    return "No Gemfile/bundle found in this repo -- skipping all Ruby quality gates." if bundled.nil?
 
-    sections = []
-    sections << gated_report(bundled, rails)
-    sections << flog_report(bundled)
-    sections << flay_report(bundled)
-    sections << info_report(bundled)
-
+    sections = [gated_report(bundled, rails_app?(bundled)),
+                flog_report(bundled), flay_report(bundled), info_report(bundled)]
     sections.compact.join("\n\n")
   end
 
@@ -91,39 +87,32 @@ class QualityGateTool < CodingTool
   end
 
   def rails_app?(bundled)
-    return false if bundled.nil?
-
     bundled.include?("rails") && File.exist?(File.join(cwd, "config", "application.rb"))
   end
 
   def gated_report(bundled, rails)
-    return "No Gemfile/bundle found in this repo -- skipping all Ruby quality gates." if bundled.nil?
+    gated_section(GATED_CHECKS.map { |check| gated_check_result(check, bundled, rails) })
+  end
 
-    lines = ["## Quality gates"]
-    failed = false
+  # results: the [report line, failed?] pairs from every gated check.
+  def gated_section(results)
+    verdict = results.any?(&:last) ? "FAIL -- see the FAIL sections above" : "PASS"
+    ["## Quality gates", *results.map(&:first), "\nOverall: #{verdict}"].join("\n")
+  end
 
-    GATED_CHECKS.each do |check|
-      if check[:rails_only] && !rails
-        lines << "- SKIP #{check[:name]} (not a Rails app)"
-        next
-      end
-      unless bundled.include?(check[:gem])
-        lines << "- SKIP #{check[:name]} (gem '#{check[:gem]}' not in this repo's Gemfile)"
-        next
-      end
+  # One check's [report line, failed?] pair.
+  def gated_check_result(check, bundled, rails)
+    name, gem_name, rails_only = check.values_at(:name, :gem, :rails_only)
+    return ["- SKIP #{name} (not a Rails app)", false] if rails_only && !rails
+    return ["- SKIP #{name} (gem '#{gem_name}' not in this repo's Gemfile)", false] unless bundled.include?(gem_name)
 
-      command = check[:command].is_a?(Symbol) ? send(check[:command]) : check[:command]
-      output, status = run(command)
-      if status&.success?
-        lines << "- PASS #{check[:name]}"
-      else
-        failed = true
-        lines << "- FAIL #{check[:name]}\n#{indent(truncate(output))}"
-      end
-    end
+    output, passed = run(resolve_command(check[:command]))
+    passed ? ["- PASS #{name}", false] : ["- FAIL #{name}\n#{indent(truncate(output))}", true]
+  end
 
-    lines << "\nOverall: #{failed ? 'FAIL -- see the FAIL sections above' : 'PASS'}"
-    lines.join("\n")
+  # A Symbol command names a private method that builds the real command line.
+  def resolve_command(command)
+    command.is_a?(Symbol) ? send(command) : command
   end
 
   # bundle-audit hardcodes a look for a file literally named "Gemfile.lock" in
@@ -142,72 +131,82 @@ class QualityGateTool < CodingTool
 
   def flog_report(bundled)
     dirs = code_dirs
-    return nil if bundled.nil? || dirs.empty? || !bundled.include?("flog")
+    return nil if dirs.empty? || !bundled.include?("flog")
 
-    output, status = run("bundle exec flog -a #{dirs.join(' ')}")
-    return "## Flog Complexity\n- SKIP (flog did not run: #{truncate(output)})" unless status&.success?
+    output, ran = run("bundle exec flog -a #{dirs.join(' ')}")
+    return "## Flog Complexity\n- SKIP (flog did not run: #{truncate(output)})" unless ran
 
-    scores = output.each_line.filter_map { |l| l.match(/^\s*([\d.]+):\s+(.+)$/) }
-                   .drop(2) # first two lines are the total and per-method average
-                   .map { |m| [m[1].to_f, m[2].strip] }
+    flog_section(flog_scores(output))
+  end
+
+  # [[score, method], ...] parsed from flog's per-method report lines.
+  def flog_scores(output)
+    output.each_line.filter_map { |l| l.match(/^\s*([\d.]+):\s+(.+)$/) }
+          .drop(2) # first two lines are the total and per-method average
+          .map { |m| [m[1].to_f, m[2].strip] }
+  end
+
+  def flog_section(scores)
     failures = scores.select { |score, _| score >= FLOG_METHOD_FAIL }
     warnings = scores.select { |score, _| score >= FLOG_METHOD_WARN && score < FLOG_METHOD_FAIL }
 
-    lines = ["## Flog Complexity (fail >= #{FLOG_METHOD_FAIL}, warn >= #{FLOG_METHOD_WARN})"]
-    lines << (failures.empty? ? "- PASS no method at or above #{FLOG_METHOD_FAIL}" : "- FAIL:")
-    failures.each { |score, method| lines << "    #{score}: #{method}" }
-    warnings.each { |score, method| lines << "  - WARN #{score}: #{method}" }
-    lines.join("\n")
+    ["## Flog Complexity (fail >= #{FLOG_METHOD_FAIL}, warn >= #{FLOG_METHOD_WARN})",
+     failures.empty? ? "- PASS no method at or above #{FLOG_METHOD_FAIL}" : "- FAIL:",
+     *failures.map { |score, method| "    #{score}: #{method}" },
+     *warnings.map { |score, method| "  - WARN #{score}: #{method}" }].join("\n")
   end
 
   def flay_report(bundled)
     dirs = code_dirs
-    return nil if bundled.nil? || dirs.empty? || !bundled.include?("flay")
+    return nil if dirs.empty? || !bundled.include?("flay")
 
-    output, status = run("bundle exec flay #{dirs.join(' ')}")
-    return "## Flay Duplication\n- SKIP (flay did not run: #{truncate(output)})" unless status&.success?
+    output, ran = run("bundle exec flay #{dirs.join(' ')}")
+    return "## Flay Duplication\n- SKIP (flay did not run: #{truncate(output)})" unless ran
 
-    masses = output.each_line.filter_map { |l| l[/mass = (\d+)/, 1]&.to_i }
+    flay_section(output.each_line.filter_map { |l| l[/mass = (\d+)/, 1]&.to_i })
+  end
+
+  def flay_section(masses)
     failures = masses.select { |m| m >= FLAY_MASS_FAIL }
-
-    lines = ["## Flay Duplication (fail mass >= #{FLAY_MASS_FAIL})"]
-    lines << if failures.empty?
-               "- PASS #{masses.size} duplication pattern(s) found, none at or above #{FLAY_MASS_FAIL}"
-             else
-               "- FAIL #{failures.size} duplication pattern(s) at or above #{FLAY_MASS_FAIL} (mass: #{failures.join(', ')})"
-             end
-    lines.join("\n")
+    verdict = if failures.empty?
+                "- PASS #{masses.size} duplication pattern(s) found, none at or above #{FLAY_MASS_FAIL}"
+              else
+                "- FAIL #{failures.size} duplication pattern(s) at or above #{FLAY_MASS_FAIL} (mass: #{failures.join(', ')})"
+              end
+    "## Flay Duplication (fail mass >= #{FLAY_MASS_FAIL})\n#{verdict}"
   end
 
   def info_report(bundled)
-    return nil if bundled.nil?
-
     dirs = code_dirs
-    sections = INFO_CHECKS.filter_map do |check|
-      next unless bundled.include?(check[:gem])
-      next if dirs.empty?
+    return nil if dirs.empty?
 
-      output, status = run(format(check[:command], dirs: dirs.join(" ")))
-      summary = status&.success? ? "no findings" : truncate(output)
-      "## #{check[:name]} (informational -- not a pass/fail gate)\n#{indent(summary)}"
-    end
-
+    sections = INFO_CHECKS.filter_map { |check| info_section(check, bundled, dirs) }
     sections.empty? ? nil : sections.join("\n\n")
+  end
+
+  def info_section(check, bundled, dirs)
+    return unless bundled.include?(check[:gem])
+
+    output, clean = run(format(check[:command], dirs: dirs.join(" ")))
+    summary = clean ? "no findings" : truncate(output)
+    "## #{check[:name]} (informational -- not a pass/fail gate)\n#{indent(summary)}"
   end
 
   def code_dirs
     %w[app lib].select { |d| File.directory?(File.join(cwd, d)) }
   end
 
+  # [captured output, success boolean]. A timed-out or unstartable command is
+  # a false, never an exception.
   def run(command)
     output = +""
     Open3.popen2e(bundle_env, command, chdir: cwd, pgroup: true) do |stdin, out, wait|
       stdin.close
       Timeout.timeout(TIMEOUT) { output << out.read }
-      return [output, wait.value]
+      return [output, wait.value.success?]
     end
   rescue Timeout::Error
-    [output + "\n[killed: exceeded #{TIMEOUT}s]", nil]
+    [output + "\n[killed: exceeded #{TIMEOUT}s]", false]
   end
 
   def truncate(text, limit: 4000)

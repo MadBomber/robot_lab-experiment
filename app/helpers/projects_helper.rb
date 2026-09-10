@@ -8,7 +8,7 @@ module ProjectsHelper
   def current_llm_pair_listed?(project, options)
     return true unless project.llm_provider?
 
-    options.any? { |o| o[:provider] == project.llm_provider && o[:model] == project.llm_model }
+    options.any? { |option| option[:provider] == project.llm_provider && option[:model] == project.llm_model }
   end
 
   # Same idea as #current_llm_pair_listed?, but for the provider select --
@@ -17,7 +17,7 @@ module ProjectsHelper
   def current_llm_provider_listed?(project, options)
     return true unless project.llm_provider?
 
-    options.any? { |o| o[:provider] == project.llm_provider }
+    options.any? { |option| option[:provider] == project.llm_provider }
   end
 
   # The project's own provider's options, grouped for the model <select> --
@@ -25,6 +25,6 @@ module ProjectsHelper
   def llm_options_for_provider(project, options)
     return [] unless project.llm_provider?
 
-    options.select { |o| o[:provider] == project.llm_provider }
+    options.select { |option| option[:provider] == project.llm_provider }
   end
 end

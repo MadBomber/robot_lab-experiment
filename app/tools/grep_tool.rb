@@ -10,16 +10,8 @@ class GrepTool < CodingTool
     base = resolve_read_path(path)
     raise RobotLab::ToolError, "no such directory: #{path}" unless File.directory?(base)
 
-    regexp = compile(pattern)
-    matches = []
-
-    files = Dir.glob(File.join(base, glob)).select { |file| File.file?(file) && read_scoped?(file) }
-    files.each do |file|
-      grep_file(file, regexp, matches)
-      break if matches.size >= MAX_MATCHES
-    end
-
-    matches.empty? ? "No matches" : matches.first(MAX_MATCHES).join("\n")
+    matches = search(base, compile(pattern), glob)
+    matches.empty? ? "No matches" : matches.join("\n")
   end
 
   private
@@ -30,14 +22,26 @@ class GrepTool < CodingTool
     raise RobotLab::ToolError, "invalid pattern: #{e.message}"
   end
 
-  def grep_file(file, regexp, matches)
-    File.foreach(file).with_index(1) do |line, lineno|
-      next unless regexp.match?(line)
+  # Matching lines ("path:lineno:line") across every readable file under base,
+  # capped at MAX_MATCHES. Lazy so the file walk stops once the cap is hit.
+  def search(base, regexp, glob)
+    Dir.glob(File.join(base, glob))
+       .lazy
+       .select { |f| File.file?(f) && read_scoped?(f) }
+       .flat_map { |file| grep_file(file, regexp, MAX_MATCHES) }
+       .first(MAX_MATCHES)
+  end
 
-      matches << "#{file.delete_prefix("#{cwd}/")}:#{lineno}:#{line.chomp}"
-      break if matches.size >= MAX_MATCHES
-    end
+  # This one file's matching lines, at most limit of them. Lazy so a huge
+  # file stops being read once its limit is hit.
+  def grep_file(file, regexp, limit)
+    File.foreach(file)
+        .with_index(1)
+        .lazy
+        .select { |line, _lineno| regexp.match?(line) }
+        .first(limit)
+        .map { |line, lineno| "#{file.delete_prefix("#{cwd}/")}:#{lineno}:#{line.chomp}" }
   rescue ArgumentError
-    nil # binary file, skip
+    [] # binary file, skip
   end
 end

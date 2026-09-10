@@ -18,4 +18,15 @@ class Message < ApplicationRecord
   # JSON column that's legitimately `{}` in tests and for some msg_types, so
   # only nil is actually invalid.
   validates :payload, exclusion: { in: [nil], message: "can't be blank" }
+
+  # The payload text a collapsed transcript row previews in its <summary>
+  # line -- nil for message types that don't collapse (see
+  # MessagesHelper#message_summary_line, which truncates it for display).
+  def summary_source
+    case msg_type
+    when "tool_use" then payload["tool_input"].to_s
+    when "tool_result" then payload["content"]
+    when "assistant_thinking" then payload["text"]
+    end
+  end
 end

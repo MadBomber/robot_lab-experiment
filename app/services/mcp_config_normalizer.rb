@@ -41,7 +41,7 @@ class McpConfigNormalizer
   def call
     return [] unless File.exist?(@path)
 
-    servers = parsed.fetch("mcpServers", nil)
+    servers = parsed["mcpServers"]
     return [] if servers.nil?
     unless servers.is_a?(Hash)
       raise Error, "mcpServers must be an object keyed by server name, got #{servers.class}"

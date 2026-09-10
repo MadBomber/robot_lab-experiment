@@ -5,7 +5,7 @@ module TaskDocument
   module_function
 
   def archive_root
-    File.expand_path(ENV.fetch("ROBOT_LAB_EXPERIMENT_ARCHIVE_ROOT", "~/.robot_lab_experiment"))
+    File.expand_path(ENV.fetch("ROBOT_LAB_EXPERIMENT_ARCHIVE_ROOT") { "~/.robot_lab_experiment" })
   end
 
   def doc_path(task)

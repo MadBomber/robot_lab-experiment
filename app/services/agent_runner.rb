@@ -27,7 +27,7 @@ class AgentRunner
     @task.increment!(:workflow_run_count)
 
     conversation = Conversation.create!(
-      task: @task, provider: provider || effective_provider, model: model || effective_model, started_at: Time.current
+      task: @task, provider: effective_provider(provider), model: effective_model(model), started_at: Time.current
     )
     agent_run = AgentRun.create!(
       task: @task, conversation:, agent_type: agent_type.to_s, status: "running"
@@ -40,11 +40,11 @@ class AgentRunner
 
   private
 
-  def effective_provider
-    @task.llm_provider.presence || DEFAULT_PROVIDER
+  def effective_provider(override = nil)
+    override.presence || @task.llm_provider.presence || DEFAULT_PROVIDER
   end
 
-  def effective_model
-    @task.llm_model.presence || DEFAULT_MODEL
+  def effective_model(override = nil)
+    override.presence || @task.llm_model.presence || DEFAULT_MODEL
   end
 end

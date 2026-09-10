@@ -13,57 +13,67 @@ class AgentRunJob < ApplicationJob
   SETTLE_DELAY = 1.second
 
   def perform(agent_run_id)
-    agent_run = AgentRun.find(agent_run_id)
-    task = agent_run.task
-    conversation = agent_run.conversation
-    recorder = TranscriptRecorder.new(conversation)
+    @agent_run = AgentRun.find(agent_run_id)
+    @task = agent_run.task
+    @conversation = agent_run.conversation
+    @recorder = TranscriptRecorder.new(conversation)
+    @cwd = task.effective_cwd
+    @sandbox_level = read_sandbox_level_for(agent_run.agent_type)
 
-    run_turn(agent_run, task, conversation, recorder)
+    run_turn
 
     AgentRunCompletionJob.set(wait: SETTLE_DELAY).perform_later(agent_run.id)
   end
 
   private
 
-  def run_turn(agent_run, task, conversation, recorder)
+  # One AgentRun per job execution: perform assigns everything up front and
+  # the rest of the job reads it back through these, instead of threading the
+  # same run/task/conversation through every private method's parameters.
+  attr_reader :agent_run, :task, :conversation, :recorder, :cwd, :sandbox_level, :robot
+
+  def run_turn
     recorder.start
-    monitor = PlateauMonitor.new
-    robot = build_robot(agent_run, task, conversation, recorder, monitor)
     # Robot#run has its own `tools: :none` default, independent of local_tools
     # passed to RobotLab.build -- without this, the chat's tool list gets
     # wiped to empty on every turn and the LLM never sees any of our tools.
-    robot.run(kickoff_message(task), tools: :inherit)
+    build_robot.run(kickoff_message, tools: :inherit)
     agent_run.update!(status: "completed")
   rescue Cancelled
-    cancelled(agent_run)
+    cancelled
   rescue PlateauMonitor::Plateaued, RobotLab::ToolLoopError => e
-    plateaued(agent_run, task, e)
+    plateaued(e)
   rescue StandardError => e
-    failed(agent_run, e)
+    failed(e)
   ensure
-    # RobotLab connects the MCP clients when the robot is built; tear down their
-    # stdio subprocesses when the turn ends.
-    robot.disconnect if robot.respond_to?(:disconnect)
+    teardown
+  end
+
+  # RobotLab connects the MCP clients when the robot is built; tear down their
+  # stdio subprocesses when the turn ends. `try`: build_robot may not have
+  # assigned @robot (or returned a robot without MCP) when the turn unwound.
+  def teardown
+    robot.try(:disconnect)
     recorder.finish
   end
 
   # A human hit Stop/Abandon; the task is already blocked by the controller.
-  def cancelled(agent_run)
+  def cancelled
     agent_run.update!(status: "cancelled")
-    Rails.logger.info("#{tag(agent_run)} cancelled by request")
+    Rails.logger.info("#{tag} cancelled by request")
   end
 
   # A stuck run, caught early by the within-run monitor (or robot_lab's own
   # circuit breaker). Block the whole task so the pipeline stops instead of
   # burning more runs; a human can inspect, guide, and unblock (see #22/#23).
-  def plateaued(agent_run, task, error)
+  def plateaued(error)
     agent_run.update!(status: "blocked")
     task.update!(
       blocked_reason: "no_progress",
       blocked_detail: "No progress: #{plateau_reason(error)} during run ##{agent_run.id} (#{agent_run.agent_type})",
       blocked_run_id: agent_run.id
     )
-    Rails.logger.warn("#{tag(agent_run)} plateaued: #{error.message}")
+    Rails.logger.warn("#{tag} plateaued: #{error.message}")
   end
 
   # PlateauMonitor::Plateaued#reason is the clean, prefix-free message; any
@@ -73,18 +83,18 @@ class AgentRunJob < ApplicationJob
     error.try(:reason) || error.message
   end
 
-  def failed(agent_run, error)
+  def failed(error)
     agent_run.update!(status: "failed")
-    Rails.logger.error("#{tag(agent_run)} failed: #{error.inspect}")
+    Rails.logger.error("#{tag} failed: #{error.inspect}")
   end
 
-  def tag(agent_run)
+  def tag
     "AgentRunJob##{agent_run.id} (#{agent_run.agent_type})"
   end
 
   # The opening message for the turn. Prepends any human redirect (#23) queued
   # since the last run and consumes it, so guidance applies to exactly this run.
-  def kickoff_message(task)
+  def kickoff_message
     guidance = task.pending_guidance
     return "Begin." if guidance.blank?
 
@@ -93,15 +103,18 @@ class AgentRunJob < ApplicationJob
       "Follow it, adjusting your plan as needed:\n\n#{guidance}\n\nBegin."
   end
 
-  def build_robot(agent_run, task, conversation, recorder, monitor)
-    RobotLab.build(
+  # Builds the turn's robot and keeps it on @robot so teardown can reach it
+  # even when the turn unwinds mid-flight.
+  def build_robot
+    monitor = PlateauMonitor.new
+    @robot = RobotLab.build(
       name: "#{agent_run.agent_type}-task-#{task.id}",
       template: agent_run.agent_type.to_sym,
-      context: template_context(agent_run, task),
+      context: template_context,
       provider: conversation.provider,
       model: conversation.model,
-      local_tools: tools_for(agent_run, task),
-      mcp_servers: mcp_servers_for(agent_run), # RobotLab connects them + injects their tools
+      local_tools: tools_for,
+      mcp_servers: mcp_servers, # RobotLab connects them + injects their tools
       max_tool_rounds: PlateauMonitor::MAX_TOOL_CALLS, # robot_lab's coarse circuit-breaker backstop
       on_content: ->(chunk) { recorder.record_content(chunk) },
       on_tool_call: lambda { |tool_call|
@@ -119,23 +132,21 @@ class AgentRunJob < ApplicationJob
     )
   end
 
-  def template_context(agent_run, task)
+  def template_context
     context = { task_doc_path: TaskDocument.doc_path(task), task_id: task.id }
     context[:pr_status] = PrStatusService.call(task) if agent_run.pr?
     context
   end
 
-  def tools_for(agent_run, task)
+  def tools_for
     doc_tools = [ReadTaskDocTool.new(task:), WriteTaskDocTool.new(task:)]
-    cwd = task.effective_cwd
-    level = read_sandbox_level_for(agent_run.agent_type)
 
     case agent_run.agent_type
-    when "planning" then doc_tools + planning_tools(cwd, task, level)
-    when "implementation" then doc_tools + implementation_tools(cwd, level)
-    when "review" then doc_tools + review_tools(cwd, task, level)
-    when "pr" then doc_tools + pr_tools(cwd, task, level)
-    when "audit" then doc_tools + audit_tools(cwd, level)
+    when "planning" then doc_tools + planning_tools
+    when "implementation" then doc_tools + implementation_tools
+    when "review" then doc_tools + review_tools
+    when "pr" then doc_tools + pr_tools
+    when "audit" then doc_tools + audit_tools
     end
   end
 
@@ -143,40 +154,40 @@ class AgentRunJob < ApplicationJob
     CodingTool.effective_sandbox_level(agent_type: agent_type)
   end
 
-  def planning_tools(cwd, task, level)
+  def planning_tools
     # RobotLab::AskUser reads from $stdin/$stdout, which has no meaningful
     # source in a background job -- it would hang the run. Clarifying
     # questions over the web UI are a later phase (extra/chat-ux.md); for now
     # the prompt instructs the agent to make a reasonable assumption instead.
-    [ReadFileTool.new(cwd:, sandbox_level: level), GlobTool.new(cwd:, sandbox_level: level), GrepTool.new(cwd:, sandbox_level: level),
+    [ReadFileTool.new(cwd:, sandbox_level:), GlobTool.new(cwd:, sandbox_level:), GrepTool.new(cwd:, sandbox_level:),
      MarkPlanningCompleteTool.new(task:)]
   end
 
-  def implementation_tools(cwd, level)
-    [ReadFileTool.new(cwd:, sandbox_level: level),
+  def implementation_tools
+    [ReadFileTool.new(cwd:, sandbox_level:),
      WriteFileTool.new(cwd:, sandbox_level: "tight"), EditFileTool.new(cwd:, sandbox_level: "tight"),
-     GlobTool.new(cwd:, sandbox_level: level), GrepTool.new(cwd:, sandbox_level: level), BashTool.new(cwd:)]
+     GlobTool.new(cwd:, sandbox_level:), GrepTool.new(cwd:, sandbox_level:), BashTool.new(cwd:)]
   end
 
-  def review_tools(cwd, task, level)
-    [ReadFileTool.new(cwd:, sandbox_level: level), GlobTool.new(cwd:, sandbox_level: level),
-     GrepTool.new(cwd:, sandbox_level: level), BashTool.new(cwd:), QualityGateTool.new(cwd:),
+  def review_tools
+    [ReadFileTool.new(cwd:, sandbox_level:), GlobTool.new(cwd:, sandbox_level:),
+     GrepTool.new(cwd:, sandbox_level:), BashTool.new(cwd:), QualityGateTool.new(cwd:),
      MarkWorkflowCompleteTool.new(task:), MarkWorkflowBlockedTool.new(task:)]
   end
 
-  def pr_tools(cwd, task, level)
+  def pr_tools
     [BashTool.new(cwd:), MarkPrCompleteTool.new(task:)]
   end
 
-  def audit_tools(cwd, level)
-    [ReadFileTool.new(cwd:, sandbox_level: level), GlobTool.new(cwd:, sandbox_level: level), GrepTool.new(cwd:, sandbox_level: level),
+  def audit_tools
+    [ReadFileTool.new(cwd:, sandbox_level:), GlobTool.new(cwd:, sandbox_level:), GrepTool.new(cwd:, sandbox_level:),
      ListGithubIssuesTool.new(cwd:), CreateGithubIssueTool.new(cwd:)]
   end
 
   # MCP servers for this run. Review is the verification stage, so it's the one
   # that gets browser/MCP access; other stages get none. RobotLab owns the
   # connection lifecycle (Robot::MCPManagement) -- we just hand it the spec array.
-  def mcp_servers_for(agent_run)
+  def mcp_servers
     return [] unless agent_run.agent_type == "review"
 
     McpConfigNormalizer.call

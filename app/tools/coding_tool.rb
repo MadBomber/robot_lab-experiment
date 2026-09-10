@@ -23,7 +23,7 @@ class CodingTool < RobotLab::Tool
     end
 
     def effective_sandbox_level(agent_type: nil)
-      agent_type_override(agent_type) || ENV.fetch("AGENT_SANDBOX_LEVEL", "tight").to_s.downcase
+      agent_type_override(agent_type) || ENV.fetch("AGENT_SANDBOX_LEVEL") { "tight" }.to_s.downcase
     end
 
     # Memoized set of bundled gem paths (readable at the loose + root levels).
@@ -40,7 +40,7 @@ class CodingTool < RobotLab::Tool
 
     # Memoized directories from AGENT_READABLE_ROOT (comma- or newline-delimited).
     def readable_roots
-      @readable_roots ||= ENV.fetch("AGENT_READABLE_ROOT", "")
+      @readable_roots ||= ENV.fetch("AGENT_READABLE_ROOT") { "" }
                              .tr(",", "\n")
                              .split("\n")
                              .map(&:strip)

@@ -75,19 +75,23 @@ class Task < ApplicationRecord
     nil
   end
 
+  # The Task flag that marks each stage finished. Implementation and review
+  # share one "done" signal (workflow_complete) since they alternate rather
+  # than complete independently -- see AgentRunCompletionHandler.
+  STAGE_DONE_FLAGS = {
+    "planning"       => :planning_complete?,
+    "implementation" => :workflow_complete?,
+    "review"         => :workflow_complete?,
+    "pr"             => :pr_agent_complete?
+  }.freeze
+
   # :done / :active / :pending for one stage, for the stepper to color.
-  # Implementation and review share one "done" signal (workflow_complete)
-  # since they alternate rather than complete independently -- see
-  # AgentRunCompletionHandler.
   def pipeline_stage_status(stage)
-    case stage
-    when "planning"
-      planning_complete? ? :done : stage_active_or_pending(stage)
-    when "implementation", "review"
-      workflow_complete? ? :done : stage_active_or_pending(stage)
-    when "pr"
-      pr_agent_complete? ? :done : stage_active_or_pending(stage)
-    end
+    done_flag = STAGE_DONE_FLAGS[stage]
+    return if done_flag.nil?
+    return :done if public_send(done_flag)
+
+    stage == current_pipeline_stage ? :active : :pending
   end
 
   def unblock!
@@ -127,10 +131,6 @@ class Task < ApplicationRecord
   end
 
   private
-
-  def stage_active_or_pending(stage)
-    current_pipeline_stage == stage ? :active : :pending
-  end
 
   def audit_runnable_types
     agent_runs.audit.exists? ? [] : ["audit"]

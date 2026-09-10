@@ -25,24 +25,18 @@ module MessagesHelper
   }.freeze
 
   def message_icon_name(msg_type)
-    ICON_NAMES.fetch(msg_type, :settings)
+    ICON_NAMES[msg_type] || :settings
   end
 
   def message_badge_variant(msg_type)
-    BADGE_VARIANTS.fetch(msg_type, :outline)
+    BADGE_VARIANTS[msg_type] || :outline
   end
 
   # One-line preview shown in a collapsed transcript entry's <summary>, before
   # the full payload is revealed. nil for message types that don't collapse.
   def message_summary_line(message)
-    case message.msg_type
-    when "tool_use"
-      truncate_summary(message.payload["tool_input"].to_s)
-    when "tool_result"
-      truncate_summary(message.payload["content"])
-    when "assistant_thinking"
-      truncate_summary(message.payload["text"])
-    end
+    source = message.summary_source
+    truncate_summary(source) unless source.nil?
   end
 
   private

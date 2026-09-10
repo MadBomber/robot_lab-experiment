@@ -5,22 +5,39 @@ class EditFileTool < CodingTool
   param :new_string, type: "string", desc: "The replacement text."
   param :replace_all, type: "boolean", desc: "Replace every occurrence instead of requiring exactly one.", required: false
 
-  def execute(path:, old_string:, new_string:, replace_all: false)
+  # replace_all defaults to nil (an omitted optional param); nil and false
+  # behave identically here.
+  def execute(path:, old_string:, new_string:, replace_all: nil)
     full = resolve_write_path(path)
+    content = read_target(full, path)
+    occurrences = occurrences_of(content, old_string, path)
+    raise_not_unique(path, occurrences) if occurrences > 1 && !replace_all
+
+    # gsub covers the non-replace_all case too: the guard above means a lone
+    # occurrence is all that's left to replace. Block form so backslash
+    # sequences in new_string (\0, \1, ...) are treated as literal text
+    # instead of regexp backreferences.
+    File.write(full, content.gsub(old_string) { new_string })
+    "Replaced #{occurrences} occurrence(s) in #{path}"
+  end
+
+  private
+
+  def read_target(full, path)
     raise RobotLab::ToolError, "no such file: #{path}" unless File.file?(full)
 
-    content = File.read(full)
+    File.read(full)
+  end
+
+  def occurrences_of(content, old_string, path)
     occurrences = content.scan(old_string).size
     raise RobotLab::ToolError, "old_string not found in #{path}" if occurrences.zero?
-    if occurrences > 1 && !replace_all
-      raise RobotLab::ToolError,
-            "old_string is not unique in #{path} (#{occurrences} matches) -- pass replace_all or a more specific string"
-    end
 
-    # Block form so backslash sequences in new_string (\0, \1, ...) are treated
-    # as literal text instead of regexp backreferences.
-    updated = replace_all ? content.gsub(old_string) { new_string } : content.sub(old_string) { new_string }
-    File.write(full, updated)
-    "Replaced #{replace_all ? occurrences : 1} occurrence(s) in #{path}"
+    occurrences
+  end
+
+  def raise_not_unique(path, occurrences)
+    raise RobotLab::ToolError,
+          "old_string is not unique in #{path} (#{occurrences} matches) -- pass replace_all or a more specific string"
   end
 end

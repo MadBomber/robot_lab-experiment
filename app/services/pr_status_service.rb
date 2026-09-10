@@ -15,9 +15,10 @@ class PrStatusService
   def call
     return "No branch yet." unless @task.branch_name?
 
-    out, _err, status = Open3.capture3("gh", "pr", "view", @task.branch_name, "--json", "url,state",
+    branch = @task.branch_name
+    out, _err, status = Open3.capture3("gh", "pr", "view", branch, "--json", "url,state",
                                        chdir: @task.effective_cwd)
-    return "No pull request open yet for branch #{@task.branch_name}." unless status.success?
+    return "No pull request open yet for branch #{branch}." unless status.success?
 
     data = JSON.parse(out)
     "PR already exists: #{data['url']} (state: #{data['state']})."

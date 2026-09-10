@@ -64,7 +64,7 @@ class TranscriptRecorder
   def flush_thinking
     return if @thinking_buffer.empty?
 
-    persist(:assistant_thinking, { text: @thinking_buffer }, broadcast: false)
+    persist_quietly(:assistant_thinking, { text: @thinking_buffer })
     @thinking_buffer = +""
   end
 
@@ -75,10 +75,21 @@ class TranscriptRecorder
     @content_buffer = +""
   end
 
-  def persist(msg_type, payload, broadcast: true)
+  def persist(msg_type, payload)
+    message = record(msg_type, payload)
+    broadcast_message(message)
+    message
+  end
+
+  # Persist without a Turbo broadcast -- for rows the live transcript view
+  # doesn't stream (currently only assistant_thinking).
+  def persist_quietly(msg_type, payload)
+    record(msg_type, payload)
+  end
+
+  def record(msg_type, payload)
     message = @conversation.messages.create!(uuid: SecureRandom.uuid, seq: @seq, msg_type:, payload:)
     @seq += 1
-    broadcast_message(message) if broadcast
     message
   end
 
