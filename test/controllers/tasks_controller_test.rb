@@ -84,9 +84,13 @@ class TasksControllerTest < ActionDispatch::IntegrationTest
     assert_equal 0, @project.tasks.count
   end
 
-  test "new pre-fills title and description from a from_issue param" do
-    issue = GithubIssueService::Issue.new(number: 5, title: "Fix the thing", body: "Steps to reproduce...",
-                                          url: "https://github.com/x/y/issues/5")
+  test "new pre-fills title and the full issue thread (body plus comments) from a from_issue param" do
+    issue = GithubIssueService::Issue.new(
+      number: 5, title: "Fix the thing", body: "Steps to reproduce...",
+      url: "https://github.com/x/y/issues/5",
+      comments: [GithubIssueService::Comment.new(author: "reviewer", body: "Confirmed -- fix the validator.",
+                                                 created_at: "2026-09-10T17:00:00Z")]
+    )
     GithubIssueService.stub(:find, ->(*_args) { issue }) do
       get new_project_task_url(@project, from_issue: 5)
     end
@@ -94,6 +98,8 @@ class TasksControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_select "input#task_title[value=?]", "Fix the thing"
     assert_select "textarea#task_description", text: /Steps to reproduce.../
+    assert_select "textarea#task_description", text: /Comment from reviewer/
+    assert_select "textarea#task_description", text: /Confirmed -- fix the validator\./
   end
 
   test "new renders a blank form when the from_issue lookup fails" do

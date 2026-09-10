@@ -164,6 +164,6 @@ class TasksController < ApplicationController
     return unless issue
 
     task.title = issue.title
-    task.description = "#{issue.body}\n\n(from #{issue.url})"
+    task.description = "#{issue.thread_text}\n\n(from #{issue.url})"
   end
 end
