@@ -21,6 +21,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_10_175144) do
     t.datetime "updated_at", null: false
     t.index ["conversation_id"], name: "index_agent_runs_on_conversation_id", unique: true
     t.index ["task_id", "status"], name: "index_agent_runs_on_task_id_and_status"
+    t.index ["task_id"], name: "index_agent_runs_one_running_per_task", unique: true, where: "status = 'running'"
   end
 
   create_table "conversations", force: :cascade do |t|

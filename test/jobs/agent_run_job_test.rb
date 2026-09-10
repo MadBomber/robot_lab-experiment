@@ -138,6 +138,7 @@ class AgentRunJobTest < ActiveSupport::TestCase
   end
 
   test "gives the planning agent read/search tools plus the planning completion tool" do
+    @agent_run.update!(status: "completed")
     planning_run = AgentRun.create!(
       task: @task,
       conversation: Conversation.create!(task: @task, provider: "ollama", model: "qwen3.6:latest", started_at: Time.current),
@@ -159,6 +160,7 @@ class AgentRunJobTest < ActiveSupport::TestCase
   end
 
   test "gives the pr agent bash plus the pr completion tool" do
+    @agent_run.update!(status: "completed")
     pr_run = AgentRun.create!(
       task: @task,
       conversation: Conversation.create!(task: @task, provider: "ollama", model: "qwen3.6:latest", started_at: Time.current),
@@ -179,6 +181,7 @@ class AgentRunJobTest < ActiveSupport::TestCase
   end
 
   test "gives the review agent the workflow completion tools but not the planning one" do
+    @agent_run.update!(status: "completed")
     review_run = AgentRun.create!(
       task: @task,
       conversation: Conversation.create!(task: @task, provider: "ollama", model: "qwen3.6:latest", started_at: Time.current),
@@ -200,6 +203,7 @@ class AgentRunJobTest < ActiveSupport::TestCase
   end
 
   test "gives the audit agent issue-filing tools, no completion tools" do
+    @agent_run.update!(status: "completed")
     audit_run = AgentRun.create!(
       task: @task,
       conversation: Conversation.create!(task: @task, provider: "ollama", model: "qwen3.6:latest", started_at: Time.current),
@@ -226,6 +230,7 @@ class AgentRunJobTest < ActiveSupport::TestCase
   # point (RobotLab connects/injects/disconnects the MCP clients itself).
 
   def review_run
+    @agent_run.update!(status: "completed")
     AgentRun.create!(
       task: @task,
       conversation: Conversation.create!(task: @task, provider: "ollama", model: "qwen3.6:latest", started_at: Time.current),

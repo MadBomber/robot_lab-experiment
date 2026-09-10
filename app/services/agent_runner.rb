@@ -24,18 +24,22 @@ class AgentRunner
   def start_agent_run(agent_type, provider: nil, model: nil)
     raise AlreadyRunningError, "task #{@task.id} already has a running agent" if @task.running_agent_run
 
-    @task.increment!(:workflow_run_count)
+    @task.transaction do
+      @task.increment!(:workflow_run_count)
 
-    conversation = Conversation.create!(
-      task: @task, provider: effective_provider(provider), model: effective_model(model), started_at: Time.current
-    )
-    agent_run = AgentRun.create!(
-      task: @task, conversation:, agent_type: agent_type.to_s, status: "running"
-    )
-    @task.recompute_status!
+      conversation = Conversation.create!(
+        task: @task, provider: effective_provider(provider), model: effective_model(model), started_at: Time.current
+      )
+      agent_run = AgentRun.create!(
+        task: @task, conversation:, agent_type: agent_type.to_s, status: "running"
+      )
+      @task.recompute_status!
 
-    AgentRunJob.perform_later(agent_run.id)
-    agent_run
+      AgentRunJob.perform_later(agent_run.id)
+      agent_run
+    end
+  rescue ActiveRecord::RecordNotUnique
+    raise AlreadyRunningError, "task #{@task.id} already has a running agent"
   end
 
   private

@@ -49,6 +49,51 @@ class AgentRunnerTest < ActiveSupport::TestCase
     end
   end
 
+  test "database enforces a single running AgentRun per task" do
+    AgentRunner.start_agent_run(@task, :planning)
+    conversation = Conversation.create!(
+      task: @task, provider: "openrouter", model: "moonshotai/kimi-k2.7-code", started_at: Time.current
+    )
+
+    assert_raises(ActiveRecord::RecordNotUnique) do
+      AgentRun.create!(task: @task, conversation:, agent_type: "implementation", status: "running")
+    end
+  end
+
+  test "raises AlreadyRunningError when the database catches a race" do
+    AgentRunner.start_agent_run(@task, :planning)
+
+    @task.stub(:running_agent_run, nil) do
+      assert_raises(AgentRunner::AlreadyRunningError) do
+        AgentRunner.start_agent_run(@task, :implementation)
+      end
+    end
+  end
+
+  test "does not leave an orphan conversation when the database catches a race" do
+    AgentRunner.start_agent_run(@task, :planning)
+
+    @task.stub(:running_agent_run, nil) do
+      assert_no_difference -> { @task.reload.conversations.count } do
+        assert_raises(AgentRunner::AlreadyRunningError) do
+          AgentRunner.start_agent_run(@task, :implementation)
+        end
+      end
+    end
+  end
+
+  test "does not increment workflow_run_count when the database catches a race" do
+    AgentRunner.start_agent_run(@task, :planning)
+
+    @task.stub(:running_agent_run, nil) do
+      assert_no_difference -> { @task.reload.workflow_run_count } do
+        assert_raises(AgentRunner::AlreadyRunningError) do
+          AgentRunner.start_agent_run(@task, :implementation)
+        end
+      end
+    end
+  end
+
   test "accepts an explicit provider and model override" do
     run = AgentRunner.start_agent_run(@task, :implementation, provider: "openai", model: "gpt-5")
     assert_equal "openai", run.conversation.provider

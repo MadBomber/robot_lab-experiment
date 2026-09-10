@@ -1,4 +1,10 @@
-inherit_from: ../.rubocop-base.yml
+<%
+  require "pathname"
+  base = Pathname.new(Dir.pwd).ascend.map { |d| d.join(".rubocop-base.yml") }.find(&:exist?)
+  raise ".rubocop-base.yml not found" unless base
+%>
+inherit_from:
+  - <%= base %>
 
 # Rails-generated boilerplate this app doesn't hand-author.
 AllCops:
