@@ -1,0 +1,28 @@
+<%# The page furniture every top-level screen opens with (the poetry
+    page-header block pattern): optional breadcrumb trail, title with
+    supporting description, the caller's block as right-aligned actions,
+    and a grounding rule. Render via `render layout:` with a (possibly
+    empty) block for the actions; locals: title (required), description,
+    description_class, and crumbs as [label, href-or-nil] pairs. %>
+<header class="flex flex-col gap-4">
+  <% if local_assigns[:crumbs].present? %>
+    <%= poetry_breadcrumb do |crumb| %>
+      <% crumbs.each do |label, href| %>
+        <% href ? crumb.with_item(label, href:) : crumb.with_item(label) %>
+      <% end %>
+    <% end %>
+  <% end %>
+  <div class="flex flex-wrap items-end justify-between gap-4">
+    <div class="space-y-1">
+      <h1 class="text-2xl font-semibold tracking-tight"><%= title %></h1>
+      <% if local_assigns[:description].present? %>
+        <p class="text-sm text-muted-foreground <%= local_assigns[:description_class] %>"><%= description %></p>
+      <% end %>
+    </div>
+    <% actions = yield %>
+    <% if actions.present? %>
+      <div class="flex flex-wrap items-center gap-2"><%= actions %></div>
+    <% end %>
+  </div>
+  <%= poetry_separator %>
+</header>

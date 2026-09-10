@@ -24,8 +24,22 @@ module MessagesHelper
     "result"             => :success
   }.freeze
 
+  # Poetry bubble variant per plain-row message type: the local user's
+  # kickoff reads :secondary, agent prose sits on the muted surface, and
+  # system/result text follows the Bubble contract's :ghost/:tinted intents.
+  BUBBLE_VARIANTS = {
+    "user"      => :secondary,
+    "assistant" => :muted,
+    "system"    => :ghost,
+    "result"    => :tinted
+  }.freeze
+
   def message_icon_name(msg_type)
     ICON_NAMES[msg_type] || :settings
+  end
+
+  def message_bubble_variant(msg_type)
+    BUBBLE_VARIANTS[msg_type] || :ghost
   end
 
   def message_badge_variant(msg_type)

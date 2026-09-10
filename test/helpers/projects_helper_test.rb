@@ -20,22 +20,25 @@ class ProjectsHelperTest < ActionView::TestCase
     assert_not current_llm_pair_listed?(project, options)
   end
 
-  test "current_llm_provider_listed? is false when the provider itself isn't offered at all" do
-    project = Project.new(llm_provider: "azure", llm_model: "gpt-4o")
-    options = [{ provider: "openrouter", model: "moonshotai/kimi-k2", label: "OpenRouter - Kimi K2" }]
-    assert_not current_llm_provider_listed?(project, options)
+  test "llm_choice_value combines the override as provider|model" do
+    project = Project.new(llm_provider: "openrouter", llm_model: "moonshotai/kimi-k2")
+    assert_equal "openrouter|moonshotai/kimi-k2", llm_choice_value(project)
   end
 
-  test "llm_options_for_provider returns only that provider's options" do
-    project = Project.new(llm_provider: "ollama")
+  test "llm_choice_value is blank when the project has no override" do
+    assert_equal "", llm_choice_value(Project.new)
+  end
+
+  test "llm_choice_groups groups [label, value] pairs by provider" do
     options = [
       { provider: "ollama", model: "qwen3.6:latest", label: "Ollama - qwen3.6:latest" },
       { provider: "openrouter", model: "moonshotai/kimi-k2", label: "OpenRouter - Kimi K2" }
     ]
-    assert_equal [options.first], llm_options_for_provider(project, options)
-  end
 
-  test "llm_options_for_provider is empty when the project has no override" do
-    assert_equal [], llm_options_for_provider(Project.new, [{ provider: "ollama", model: "x", label: "x" }])
+    groups = llm_choice_groups(options)
+
+    assert_equal %w[ollama openrouter], groups.keys
+    assert_equal [["Ollama - qwen3.6:latest", "ollama|qwen3.6:latest"]], groups["ollama"]
+    assert_equal [["OpenRouter - Kimi K2", "openrouter|moonshotai/kimi-k2"]], groups["openrouter"]
   end
 end

@@ -105,17 +105,25 @@ class ProjectsControllerTest < ActionDispatch::IntegrationTest
     assert_equal "Renamed", task.name  # name was saved successfully
   end
 
-  test "update_llm sets the project's provider and model" do
+  test "update_llm sets the project's provider and model from the combined combobox value" do
     project = Project.create!(name: "Demo", repo_folder_path: @repo_dir)
-    patch update_llm_project_url(project), params: { project: { llm_provider: "ollama", llm_model: "qwen3.6:latest" } }
+    patch update_llm_project_url(project), params: { project: { llm: "ollama|qwen3.6:latest" } }
     assert_redirected_to projects_url
     assert_equal "ollama", project.reload.llm_provider
     assert_equal "qwen3.6:latest", project.llm_model
   end
 
+  test "update_llm keeps model ids containing slashes intact" do
+    project = Project.create!(name: "Demo", repo_folder_path: @repo_dir)
+    patch update_llm_project_url(project), params: { project: { llm: "openrouter|moonshotai/kimi-k2.7-code" } }
+    assert_redirected_to projects_url
+    assert_equal "openrouter", project.reload.llm_provider
+    assert_equal "moonshotai/kimi-k2.7-code", project.llm_model
+  end
+
   test "update_llm clears the override back to the app default" do
     project = Project.create!(name: "Demo", repo_folder_path: @repo_dir, llm_provider: "ollama", llm_model: "qwen3.6:latest")
-    patch update_llm_project_url(project), params: { project: { llm_provider: "", llm_model: "" } }
+    patch update_llm_project_url(project), params: { project: { llm: "" } }
     assert_redirected_to projects_url
     assert_nil project.reload.llm_provider
     assert_nil project.llm_model

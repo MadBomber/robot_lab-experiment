@@ -77,15 +77,16 @@ class TranscriptRecorderTest < ActiveSupport::TestCase
     assert_equal([true, false], calls.map { |kwargs| kwargs.dig(:locals, :running) })
   end
 
-  test "status broadcast passes the task so the agent_status partial can build its heartbeat URL" do
+  test "status broadcast passes the conversation while running so the partial can seed clock and count" do
     calls = []
     Turbo::StreamsChannel.stub(:broadcast_replace_to, ->(*_args, **kwargs) { calls << kwargs }) do
       @recorder.start
       @recorder.finish
     end
 
-    assert(calls.all? { |kwargs| kwargs.dig(:locals, :task) == @conversation.task },
-           "every agent_status broadcast must include task: (omitting it raises in the partial mid-run)")
+    assert_equal @conversation, calls.first.dig(:locals, :conversation),
+                 "the running broadcast must include conversation: (the partial seeds elapsed/count from it)"
+    assert_nil calls.last.dig(:locals, :conversation)
   end
 
   test "seq numbers stay monotonic across flush boundaries and a fresh recorder" do

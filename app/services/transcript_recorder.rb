@@ -110,14 +110,14 @@ class TranscriptRecorder
   def broadcast_status(running:)
     return unless defined?(Turbo::StreamsChannel)
 
-    # The agent_status partial needs `task` to build the heartbeat URL, so the
-    # live-broadcast render must pass it too -- not just the initial page render
-    # via _task_header. Omitting it raises ActionView::Template::Error mid-run.
+    # The agent_status partial seeds its local elapsed clock and message
+    # count from the conversation, so the live-broadcast render must pass
+    # it too -- not just the initial page render via tasks/show.
     Turbo::StreamsChannel.broadcast_replace_to(
       "task_#{@conversation.task_id}",
       target: "agent-status",
       partial: "tasks/agent_status",
-      locals: { running:, task: @conversation.task }
+      locals: { running:, conversation: (running ? @conversation : nil) }
     )
   end
 end

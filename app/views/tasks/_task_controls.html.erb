@@ -53,7 +53,13 @@
           <% if task.pending_guidance? %>
             <p class="text-xs text-muted-foreground">Queued for the next run: <em><%= task.pending_guidance %></em></p>
           <% end %>
-          <%= form_with url: guide_project_task_path(project, task), method: :post, class: "space-y-2" do %>
+          <%# poetry_webmcp_form declares this form as a WebMCP tool so a
+              browser agent can queue guidance; a person submits it as before
+              (mutating forms always keep the human's Submit). %>
+          <%= poetry_webmcp_form(url: guide_project_task_path(project, task), method: :post,
+                tool: { name: "give_agent_guidance",
+                        description: "Queue guidance that steers this task's next agent run." },
+                class: "space-y-2") do %>
             <%= poetry_field(id: "task_guidance", label_text: "Guidance",
                   hint: "Applied on the next run. To redirect an in-flight run, Stop it first.") do |field| %>
               <%= poetry_textarea(name: "guidance", rows: 3,

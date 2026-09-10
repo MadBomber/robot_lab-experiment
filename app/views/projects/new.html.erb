@@ -1,7 +1,10 @@
 <div class="mx-auto w-full max-w-lg">
-  <h1 class="mb-6 text-2xl font-semibold tracking-tight">New project</h1>
+  <%= render layout: "shared/page_header",
+        locals: { title: "New project",
+                  crumbs: [["Projects", projects_path], ["New project", nil]] } do %>
+  <% end %>
 
-  <%= form_with model: @project, builder: Poetry::Ui::FormBuilder do |f| %>
+  <%= form_with model: @project, builder: Poetry::Ui::FormBuilder, class: "mt-6" do |f| %>
     <%= poetry_field_group do %>
       <%= f.input :name %>
       <%= f.input :repo_folder_path, label: "Repository path",

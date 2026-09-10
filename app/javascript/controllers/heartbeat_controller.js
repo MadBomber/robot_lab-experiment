@@ -1,45 +1,45 @@
 import { Controller } from "@hotwired/stimulus"
 
-// Polls the task heartbeat endpoint while an agent run is live, keeping the
-// elapsed clock and message count fresh between Turbo Stream broadcasts.
-// The controller only renders (and therefore only polls) while the
-// agent-status partial is in its running state.
+// Live "agent working" readout with no polling endpoint: the elapsed clock
+// ticks locally from the server-rendered conversation start time, and the
+// message count starts at the server-rendered value and increments as the
+// existing Turbo Stream broadcast appends rows into the transcript
+// scroller's content element.
 export default class extends Controller {
-  static values = { url: String, interval: { type: Number, default: 2000 } }
+  static values = { startedAt: String, count: Number }
   static targets = ["elapsed", "count"]
 
   connect() {
-    this.lastMessageCount = null
-    this.poll()
-    this.timer = setInterval(() => this.poll(), this.intervalValue)
+    this.startedAtMs = Date.parse(this.startedAtValue)
+    this.tick()
+    this.timer = setInterval(() => this.tick(), 1000)
+
+    const transcript = document.getElementById("transcript-messages")
+    if (transcript) {
+      this.observer = new MutationObserver((mutations) => this.rowsAppended(mutations))
+      this.observer.observe(transcript, { childList: true })
+    }
   }
 
   disconnect() {
     clearInterval(this.timer)
+    this.observer?.disconnect()
   }
 
-  async poll() {
-    try {
-      const res = await fetch(this.urlValue)
-      if (!res.ok) return
-      const data = await res.json()
-      if (!data.started_at) return // no active conversation
+  rowsAppended(mutations) {
+    const added = mutations.flatMap((m) => [...m.addedNodes]).filter((n) => n.nodeType === Node.ELEMENT_NODE).length
+    if (added === 0) return
 
-      const elapsedSecs = Math.floor((Date.now() - new Date(data.started_at).getTime()) / 1000)
-      if (this.hasElapsedTarget) this.elapsedTarget.textContent = this.formatElapsed(elapsedSecs)
-
-      if (this.hasCountTarget && data.message_count !== this.lastMessageCount) {
-        this.lastMessageCount = data.message_count
-        this.countTarget.textContent = data.message_count
-      }
-    } catch {
-      // Silently fail -- never break the page over a missed heartbeat.
-    }
+    this.countValue += added
+    if (this.hasCountTarget) this.countTarget.textContent = this.countValue
   }
 
-  formatElapsed(seconds) {
+  tick() {
+    if (!this.hasElapsedTarget || Number.isNaN(this.startedAtMs)) return
+
+    const seconds = Math.max(0, Math.floor((Date.now() - this.startedAtMs) / 1000))
     const m = Math.floor(seconds / 60)
     const s = seconds % 60
-    return `${m}:${String(s).padStart(2, "0")}`
+    this.elapsedTarget.textContent = `${m}:${String(s).padStart(2, "0")}`
   }
 }

@@ -1,0 +1,8 @@
+<%# One toast for server-side broadcasts: appended into the layout's
+    #poetry-toaster region (Toaster::Component::DEFAULT_ID) by
+    Turbo::StreamsChannel.broadcast_append_to -- see
+    AgentRunCompletionHandler#broadcast_toast. %>
+<%= poetry_toast(variant:) do |toast| %>
+  <% toast.with_title { title } %>
+  <% toast.with_description { description } if local_assigns[:description].present? %>
+<% end %>

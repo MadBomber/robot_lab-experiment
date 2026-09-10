@@ -35,6 +35,35 @@ class AgentRunCompletionHandlerTest < ActiveSupport::TestCase
     assert_includes targets, "task-sidebar"
   end
 
+  test "milestone actions broadcast a toast into the layout's toaster region" do
+    task = build_task(planning_complete: true)
+    run = finished_run(task, "planning")
+    toasts = []
+
+    Turbo::StreamsChannel.stub(:broadcast_append_to, ->(_stream, target:, **kwargs) { toasts << [target, kwargs] }) do
+      AgentRunCompletionHandler.call(run)
+    end
+
+    target, kwargs = toasts.first
+    assert_equal "poetry-toaster", target
+    assert_equal "Planning complete", kwargs.dig(:locals, :title)
+    assert_equal :info, kwargs.dig(:locals, :variant)
+  end
+
+  test "quiet chained actions broadcast no toast" do
+    task = build_task
+    run = finished_run(task, "implementation")
+    toasts = []
+
+    # Chaining tries to start the next run; AgentRunner enqueues a job, which
+    # is fine under the test adapter.
+    Turbo::StreamsChannel.stub(:broadcast_append_to, ->(*_args, **kwargs) { toasts << kwargs }) do
+      AgentRunCompletionHandler.call(run)
+    end
+
+    assert_empty toasts, "impl<->review chaining must stay quiet -- it fires every cycle"
+  end
+
   test "planning finishing with planning_complete set moves task status to in_review" do
     task = build_task(planning_complete: true)
     run = finished_run(task, "planning")

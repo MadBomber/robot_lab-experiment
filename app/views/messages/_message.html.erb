@@ -1,19 +1,27 @@
 <% case message.msg_type %>
 <% when "user", "assistant", "system", "result" %>
   <%= poetry_message_scroller_item(id: message.id) do %>
-    <div class="mb-2 rounded-lg border border-border bg-card px-4 py-3">
-      <div class="flex items-center gap-2">
+    <%= poetry_message(align: message.user? ? :end : :start, class: "mb-2") do |msg| %>
+      <% msg.with_header do %>
         <%= poetry_icon(name: message_icon_name(message.msg_type), class: "size-4 text-muted-foreground") %>
         <%= poetry_badge(variant: message_badge_variant(message.msg_type)) { message.msg_type.humanize } %>
-        <% if message.created_at %>
-          <span class="ms-auto font-mono text-xs tabular-nums text-muted-foreground"><%= message.created_at.strftime("%H:%M:%S") %></span>
+      <% end %>
+      <% if message.created_at %>
+        <% msg.with_footer do %>
+          <span class="font-mono text-xs tabular-nums"><%= message.created_at.strftime("%H:%M:%S") %></span>
         <% end %>
-      </div>
-      <div class="mt-2 whitespace-pre-wrap text-sm"><%= message.payload["text"] || message.payload["content"] %></div>
-    </div>
+      <% end %>
+      <%= poetry_bubble(variant: message_bubble_variant(message.msg_type)) do %>
+        <div class="whitespace-pre-wrap text-sm"><%= message.payload["text"] || message.payload["content"] %></div>
+      <% end %>
+    <% end %>
   <% end %>
 <% when "assistant_thinking", "tool_use", "tool_result" %>
   <%= poetry_message_scroller_item(id: message.id) do %>
+    <%# Deliberately a native <details>, not poetry_collapsible: the
+        "Collapse tool calls" toggle bulk-drives rows by setting
+        details.open, and the Collapsible contract forbids flipping its
+        data-open state from outside (see transcript_controller.js). %>
     <details class="group mb-2 rounded-lg border border-border bg-card"
       data-transcript-target="details" <%= "open" unless message.assistant_thinking? %>>
       <summary class="flex cursor-pointer list-none items-center gap-2 px-4 py-3 [&::-webkit-details-marker]:hidden">
@@ -35,12 +43,13 @@
   <% end %>
 <% else %>
   <%= poetry_message_scroller_item(id: message.id) do %>
-    <div class="mb-2 rounded-lg border border-border bg-card px-4 py-3">
-      <div class="flex items-center gap-2">
+    <%= poetry_message(class: "mb-2") do |msg| %>
+      <% msg.with_header do %>
         <%= poetry_icon(name: message_icon_name(message.msg_type), class: "size-4 text-muted-foreground") %>
         <%= poetry_badge(variant: :outline) { message.msg_type } %>
-      </div>
-      <pre class="mt-2 whitespace-pre-wrap text-sm"><%= message.payload %></pre>
-    </div>
+      <% end %>
+      <%= poetry_code_block(code: JSON.pretty_generate(message.payload), language: "json",
+            label: "#{message.msg_type} payload") %>
+    <% end %>
   <% end %>
 <% end %>

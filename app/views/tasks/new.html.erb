@@ -1,11 +1,19 @@
 <div class="mx-auto w-full max-w-lg">
-  <h1 class="mb-2 text-2xl font-semibold tracking-tight">New task in <%= @project.name %></h1>
-
-  <% if params[:from_issue].present? %>
-    <p class="mb-4 text-sm text-muted-foreground">Pre-filled from issue #<%= params[:from_issue] %> -- review before creating.</p>
+  <%= render layout: "shared/page_header",
+        locals: { title: "New task in #{@project.name}",
+                  crumbs: [["Projects", projects_path], [@project.name, project_path(@project)], ["New task", nil]] } do %>
   <% end %>
 
-  <%= form_with model: @task, url: project_tasks_path(@project), builder: Poetry::Ui::FormBuilder, class: "mt-4" do |f| %>
+  <% if params[:from_issue].present? %>
+    <p class="mt-4 text-sm text-muted-foreground">Pre-filled from issue #<%= params[:from_issue] %> -- review before creating.</p>
+  <% end %>
+
+  <%# Not poetry_webmcp_form: poetry:check's registry currently projects
+      that helper as yieldless, but this form needs the yielded builder for
+      f.input -- the guidance form (which composes bare controls) carries
+      the app's WebMCP form example instead. %>
+  <%= form_with model: @task, url: project_tasks_path(@project),
+        builder: Poetry::Ui::FormBuilder, class: "mt-6" do |f| %>
     <%= poetry_field_group do %>
       <%= f.input :title %>
       <%= f.input :description, as: :text, rows: 6, label: "Describe the work",

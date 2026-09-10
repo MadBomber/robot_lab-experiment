@@ -1,15 +1,16 @@
 <div id="agent-status">
   <% if running %>
     <div class="mt-3 flex items-center gap-3 rounded-lg border border-dashed border-border px-4 py-3 text-sm text-muted-foreground"
-      <% if task %>
+      <% if local_assigns[:conversation] %>
         data-controller="heartbeat"
-        data-heartbeat-url-value="<%= heartbeat_project_task_path(task.project_id, task) %>"
+        data-heartbeat-started-at-value="<%= conversation.started_at&.iso8601 %>"
+        data-heartbeat-count-value="<%= conversation.messages.count %>"
       <% end %>>
       <%= poetry_spinner(label: "Agent working", class: "size-4 text-primary") %>
       <span>
         Agent working &middot;
         <span class="font-mono tabular-nums" data-heartbeat-target="elapsed">...</span> &middot;
-        <span class="font-mono tabular-nums" data-heartbeat-target="count">0</span> messages
+        <span class="font-mono tabular-nums" data-heartbeat-target="count"><%= local_assigns[:conversation] ? conversation.messages.count : 0 %></span> messages
       </span>
     </div>
   <% end %>

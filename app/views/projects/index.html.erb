@@ -1,22 +1,14 @@
 <div class="mx-auto w-full max-w-3xl">
-  <header class="flex flex-col gap-4">
-    <div class="flex flex-wrap items-end justify-between gap-4">
-      <div class="space-y-1">
-        <h1 class="text-2xl font-semibold tracking-tight">Projects</h1>
-        <p class="text-sm text-muted-foreground">Git repositories the agent pipeline can run tasks against.</p>
-      </div>
-      <%= poetry_button(href: new_project_path) do |button| %>
-        <% button.with_leading { poetry_icon(name: :plus) } %>
-        New project
-      <% end %>
-    </div>
-    <%= poetry_separator %>
-  </header>
+  <%= render layout: "shared/page_header",
+        locals: { title: "Projects",
+                  description: "Git repositories the agent pipeline can run tasks against." } do %>
+    <%= poetry_button(href: new_project_path) do |button| %>
+      <% button.with_leading { poetry_icon(name: :plus) } %>
+      New project
+    <% end %>
+  <% end %>
 
-  <div class="mt-6"
-    data-controller="llm-options"
-    data-llm-options-options-value="<%= @llm_options.group_by { |o| o[:provider] }
-      .transform_values { |opts| opts.map { |o| { value: o[:model], label: o[:label] } } }.to_json %>">
+  <div class="mt-6">
     <%= poetry_item_group do %>
       <% @projects.each_with_index do |project, index| %>
         <%= poetry_item_separator(key: project) if index.positive? %>
@@ -38,29 +30,32 @@
             <%= form_with url: update_llm_project_path(project), method: :patch,
                   class: "flex flex-wrap items-center gap-2" do %>
               <span class="text-xs text-muted-foreground">LLM:</span>
-
-              <% provider_options = [["App default", ""]] %>
-              <% unless current_llm_provider_listed?(project, @llm_options) %>
-                <% provider_options << ["#{project.llm_provider} (currently set, not in the live list)", project.llm_provider] %>
-              <% end %>
-              <% provider_options += @llm_options.map { |o| o[:provider] }.uniq.map { |p| [p, p] } %>
-              <%= poetry_native_select(name: "project[llm_provider]", size: :sm, label: "LLM provider",
-                    options: provider_options, selected: project.llm_provider.to_s,
-                    data: { action: "change->llm-options#providerChanged" }) %>
-
-              <% if project.llm_provider? %>
-                <% model_options = [] %>
+              <%# One grouped, filterable picker for the provider/model pair --
+                  the value encodes both halves as "provider|model" and
+                  ProjectsController#llm_params splits it back apart. %>
+              <%# The placeholder is the combobox's blank option ("App default"
+                  serializes as ""), and show_clear is the way back to it once
+                  a real pair is committed. %>
+              <%= poetry_combobox(name: "project[llm]", value: llm_choice_value(project),
+                    placeholder: "App default (#{AgentRunner::DEFAULT_PROVIDER}/#{AgentRunner::DEFAULT_MODEL})",
+                    search_placeholder: "Search models…", show_clear: true,
+                    "aria-label": "LLM provider and model for #{project.name}",
+                    width: "w-72") do |combobox| %>
                 <% unless current_llm_pair_listed?(project, @llm_options) %>
-                  <% model_options << ["#{project.llm_model} (currently set, not in the live list)", project.llm_model] %>
+                  <%# The stored override rolled off the live catalog -- keep it
+                      representable instead of silently snapping to App default. %>
+                  <% combobox.with_item(value: llm_choice_value(project)) do %>
+                    <%= project.llm_provider %>/<%= project.llm_model %> (currently set, not in the live list)
+                  <% end %>
                 <% end %>
-                <% model_options += llm_options_for_provider(project, @llm_options).map { |o| [o[:label], o[:model]] } %>
-                <%= poetry_native_select(name: "project[llm_model]", size: :sm, label: "LLM model",
-                      options: model_options, selected: project.llm_model.to_s) %>
-              <% else %>
-                <%= poetry_native_select(name: "project[llm_model]", size: :sm, label: "LLM model", disabled: true,
-                      options: [["App default (#{AgentRunner::DEFAULT_PROVIDER}/#{AgentRunner::DEFAULT_MODEL})", ""]]) %>
+                <% llm_choice_groups(@llm_options).each do |provider, choices| %>
+                  <% combobox.with_group(heading: provider) do |group| %>
+                    <% choices.each do |label, value| %>
+                      <% group.with_item(value:) { label } %>
+                    <% end %>
+                  <% end %>
+                <% end %>
               <% end %>
-
               <%= poetry_button(variant: :secondary, size: :sm, type: :submit) { "Set" } %>
             <% end %>
           <% end %>

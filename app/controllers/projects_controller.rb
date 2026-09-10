@@ -86,7 +86,12 @@ class ProjectsController < ApplicationController
     params.expect(project: %i[name repo_folder_path subproject_path])
   end
 
+  # The index page's combobox submits the pair as one "provider|model"
+  # value (see ProjectsHelper::LLM_CHOICE_SEPARATOR); "" clears the
+  # override back to the app default.
   def llm_params
-    params.expect(project: %i[llm_provider llm_model]).transform_values(&:presence)
+    provider, model = params.expect(project: [:llm])[:llm].to_s
+                            .split(ProjectsHelper::LLM_CHOICE_SEPARATOR, 2)
+    { llm_provider: provider.presence, llm_model: model.presence }
   end
 end

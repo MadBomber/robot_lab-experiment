@@ -16,7 +16,8 @@
         <%= render partial: "messages/message", collection: @messages, as: :message %>
       <% end %>
 
-      <%= render "tasks/agent_status", running: @task.running_agent_run.present?, task: @task %>
+      <%= render "tasks/agent_status", running: @task.running_agent_run.present?,
+            conversation: @task.running_agent_run&.conversation %>
     </section>
   </div>
 </div>

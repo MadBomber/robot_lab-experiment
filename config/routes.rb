@@ -20,7 +20,6 @@ Rails.application.routes.draw do
       post :abandon, on: :member
       post :guide, on: :member
       patch :update_status, on: :member
-      get :heartbeat, on: :member
       delete :clear_completed, on: :collection
     end
     resources :audit_tasks, only: [:create]

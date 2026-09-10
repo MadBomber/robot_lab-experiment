@@ -6,6 +6,28 @@
 class AgentRunCompletionHandler
   Result = Data.define(:action, :next_agent_run)
 
+  # The human-attention milestones that also broadcast a toast into the
+  # layout's #poetry-toaster region. Chained impl<->review hops stay quiet
+  # on purpose -- they fire constantly and the task header already shows
+  # them. Toasts are supplementary: the same state always lands in the
+  # header/sidebar refresh below. A Symbol description names the private
+  # method that renders it from run/task state; a String is used verbatim.
+  TOAST_EVENTS = {
+    stopped_after_planning: { variant: :info, title: "Planning complete",
+                              description: "Review the plan, then run implementation." },
+    stopped_after_audit:    { variant: :success, title: "Audit finished" },
+    failed_no_chain:        { variant: :destructive, title: "Agent run failed",
+                              description: :failed_run_description },
+    started_pr:             { variant: :info, title: "Review approved",
+                              description: "The PR agent is running." },
+    already_complete:       { variant: :success, title: "Task complete",
+                              description: "The PR agent has finished." },
+    blocked_max_iterations: { variant: :warning, title: "Task blocked",
+                              description: :blocked_description },
+    blocked_no_progress:    { variant: :warning, title: "Task blocked",
+                              description: :blocked_description }
+  }.freeze
+
   def self.call(agent_run)
     new(agent_run).call
   end
@@ -101,6 +123,7 @@ class AgentRunCompletionHandler
     return unless defined?(Turbo::StreamsChannel)
 
     stream = "task_#{@task.id}"
+    broadcast_toast(stream, action)
 
     Turbo::StreamsChannel.broadcast_replace_to(
       stream,
@@ -115,5 +138,33 @@ class AgentRunCompletionHandler
       partial: "tasks/task_controls",
       locals: { task: @task, project: @task.project, doc_content: TaskDocument.read(@task) }
     )
+  end
+
+  def broadcast_toast(stream, action)
+    locals = toast_locals(action)
+    return unless locals
+
+    Turbo::StreamsChannel.broadcast_append_to(
+      stream, target: "poetry-toaster", partial: "shared/toast", locals:
+    )
+  end
+
+  def toast_locals(action)
+    variant, title, description = TOAST_EVENTS[action]&.values_at(:variant, :title, :description)
+    return unless title
+
+    { variant:, title:, description: resolve_toast_description(description) }
+  end
+
+  def resolve_toast_description(description)
+    description.is_a?(Symbol) ? send(description) : description
+  end
+
+  def failed_run_description
+    "The #{@agent_run.agent_type} run failed -- the pipeline stopped."
+  end
+
+  def blocked_description
+    @task.blocked_detail
   end
 end

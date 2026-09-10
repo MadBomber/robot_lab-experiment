@@ -1,37 +1,27 @@
 <div class="mx-auto w-full max-w-3xl">
-  <header class="flex flex-col gap-4">
-    <%= poetry_breadcrumb do |crumb| %>
-      <% crumb.with_item("Projects", href: projects_path) %>
-      <% crumb.with_item(@project.name) %>
+  <%= render layout: "shared/page_header",
+        locals: { title: @project.name, description: @project.effective_cwd,
+                  description_class: "font-mono",
+                  crumbs: [["Projects", projects_path], [@project.name, nil]] } do %>
+    <%= poetry_button(variant: :outline, href: edit_project_path(@project)) { "Edit" } %>
+    <%= form_with url: project_audit_tasks_path(@project), method: :post, class: "inline" do %>
+      <%= poetry_button(variant: :secondary, type: :submit) { "Run self-audit" } %>
     <% end %>
-    <div class="flex flex-wrap items-end justify-between gap-4">
-      <div class="space-y-1">
-        <h1 class="text-2xl font-semibold tracking-tight"><%= @project.name %></h1>
-        <p class="font-mono text-sm text-muted-foreground"><%= @project.effective_cwd %></p>
-      </div>
-      <div class="flex flex-wrap items-center gap-2">
-        <%= poetry_button(variant: :outline, href: edit_project_path(@project)) { "Edit" } %>
-        <%= form_with url: project_audit_tasks_path(@project), method: :post, class: "inline" do %>
-          <%= poetry_button(variant: :secondary, type: :submit) { "Run self-audit" } %>
-        <% end %>
-        <% if @tasks.any?(&:completed?) %>
-          <%= form_with url: clear_completed_project_tasks_path(@project), method: :delete, class: "inline",
-                data: { turbo_confirm: "This will permanently delete all completed tasks, their worktrees, and archived docs.\n\nAre you sure?" } do %>
-            <%= poetry_button(variant: :outline, type: :submit) { "Clear completed tasks" } %>
-          <% end %>
-        <% end %>
-        <%= form_with url: project_path(@project), method: :delete, class: "inline",
-              data: { turbo_confirm: "This will delete all tasks, worktrees, and archived docs for #{@project.name}.\n\nAre you sure?" } do %>
-          <%= poetry_button(variant: :destructive, type: :submit) { "Delete project" } %>
-        <% end %>
-        <%= poetry_button(href: new_project_task_path(@project)) do |button| %>
-          <% button.with_leading { poetry_icon(name: :plus) } %>
-          New task
-        <% end %>
-      </div>
-    </div>
-    <%= poetry_separator %>
-  </header>
+    <% if @tasks.any?(&:completed?) %>
+      <%= form_with url: clear_completed_project_tasks_path(@project), method: :delete, class: "inline",
+            data: { turbo_confirm: "This will permanently delete all completed tasks, their worktrees, and archived docs.\n\nAre you sure?" } do %>
+        <%= poetry_button(variant: :outline, type: :submit) { "Clear completed tasks" } %>
+      <% end %>
+    <% end %>
+    <%= form_with url: project_path(@project), method: :delete, class: "inline",
+          data: { turbo_confirm: "This will delete all tasks, worktrees, and archived docs for #{@project.name}.\n\nAre you sure?" } do %>
+      <%= poetry_button(variant: :destructive, type: :submit) { "Delete project" } %>
+    <% end %>
+    <%= poetry_button(href: new_project_task_path(@project)) do |button| %>
+      <% button.with_leading { poetry_icon(name: :plus) } %>
+      New task
+    <% end %>
+  <% end %>
 
   <section class="mt-6">
     <h2 class="mb-2 text-sm font-medium text-muted-foreground">Tasks</h2>
@@ -77,7 +67,14 @@
         <% end %>
       <% end %>
     <% else %>
-      <p class="text-sm text-muted-foreground">No open issues.</p>
+      <%= poetry_empty(media_variant: :icon) do |empty| %>
+        <% empty.with_media { poetry_icon(name: :inbox) } %>
+        <% empty.with_title { "No open issues" } %>
+        <% empty.with_description { "Run a self-audit to have an agent look for problems worth filing." } %>
+        <%= form_with url: project_audit_tasks_path(@project), method: :post, class: "inline" do %>
+          <%= poetry_button(variant: :outline, size: :sm, type: :submit) { "Run self-audit" } %>
+        <% end %>
+      <% end %>
     <% end %>
   </section>
 </div>
