@@ -30,6 +30,19 @@ gem "jbuilder"
 # Windows does not include zoneinfo files, so bundle the tzinfo-data gem
 gem "tzinfo-data", platforms: %i[windows jruby]
 
+# Multi-robot LLM orchestration framework driving the agent pipeline.
+# Gemfile.local re-declares these as path: gems for cross-gem development,
+# so skip them here when bundling under that gemfile.
+unless File.basename(ENV.fetch("BUNDLE_GEMFILE", "Gemfile")) == "Gemfile.local"
+  gem "robot_lab"
+  gem "robot_lab-rails"
+end
+
+# json 3.x is incompatible with activesupport 8.1.3.1 (JSON.parse options are
+# keyword-only in json 3; AS still passes a positional hash) -- drop this pin
+# once Rails ships a fix.
+gem "json", "~> 2.21"
+
 # Use the database-backed adapters for Rails.cache, Active Job, and Action Cable
 gem "ruby_llm"
 gem "solid_cable"

@@ -1,30 +1,3 @@
-PATH
-  remote: ../robot_lab-rails
-  specs:
-    robot_lab-rails (0.2.8)
-      activejob (>= 7.0)
-      activesupport (>= 7.0)
-      railties (>= 7.0)
-      robot_lab (~> 0.2.0)
-
-PATH
-  remote: ../robot_lab
-  specs:
-    robot_lab (0.2.8)
-      async (~> 2.0)
-      async-http (~> 0.60)
-      async-websocket (~> 0.30)
-      myway_config (~> 0.1)
-      prompt_manager (~> 1.0)
-      ractor_queue (~> 0.2)
-      ruby_llm (~> 1.12)
-      ruby_llm-mcp (~> 1.0)
-      ruby_llm-schema (~> 0.3)
-      ruby_llm-semantic_cache (~> 0.1)
-      simple_flow (~> 0.4)
-      typed_bus (~> 0.0.1)
-      zeitwerk (~> 2.6)
-
 GEM
   remote: https://rubygems.org/
   specs:
@@ -113,7 +86,7 @@ GEM
       console (~> 1.29)
       fiber-annotation
       io-event (~> 1.21)
-    async-http (0.103.0)
+    async-http (0.104.0)
       async (>= 2.35.1)
       async-pool (~> 0.12)
       io-endpoint (~> 0.18)
@@ -251,14 +224,14 @@ GEM
     globalid (1.4.0)
       activesupport (>= 6.1)
     hana (1.3.7)
-    herb (0.10.3-aarch64-linux-gnu)
-    herb (0.10.3-aarch64-linux-musl)
-    herb (0.10.3-arm-linux-gnu)
-    herb (0.10.3-arm-linux-musl)
-    herb (0.10.3-arm64-darwin)
-    herb (0.10.3-x86_64-darwin)
-    herb (0.10.3-x86_64-linux-gnu)
-    herb (0.10.3-x86_64-linux-musl)
+    herb (0.10.4-aarch64-linux-gnu)
+    herb (0.10.4-aarch64-linux-musl)
+    herb (0.10.4-arm-linux-gnu)
+    herb (0.10.4-arm-linux-musl)
+    herb (0.10.4-arm64-darwin)
+    herb (0.10.4-x86_64-darwin)
+    herb (0.10.4-x86_64-linux-gnu)
+    herb (0.10.4-x86_64-linux-musl)
     http-2 (1.2.2)
     httpx (1.8.3)
       http-2 (>= 1.2.0)
@@ -317,7 +290,7 @@ GEM
       anyway_config (>= 2.0)
     net-http (0.9.1)
       uri (>= 0.11.1)
-    net-imap (0.6.6)
+    net-imap (0.6.7)
       date
       net-protocol
     net-pop (0.1.2)
@@ -378,7 +351,8 @@ GEM
     protocol-http2 (0.28.0)
       protocol-hpack (~> 1.4)
       protocol-http (~> 0.62)
-    protocol-rack (0.22.1)
+    protocol-rack (0.23.0)
+      console (~> 1.0)
       io-stream (>= 0.10)
       protocol-http (~> 0.58)
       rack (>= 1.0)
@@ -462,7 +436,26 @@ GEM
     require_all (3.0.0)
     rexml (3.4.4)
     rice (4.12.0)
-    rubocop (1.90.0)
+    robot_lab (0.2.8)
+      async (~> 2.0)
+      async-http (~> 0.60)
+      async-websocket (~> 0.30)
+      myway_config (~> 0.1)
+      prompt_manager (~> 1.0)
+      ractor_queue (~> 0.2)
+      ruby_llm (~> 1.12)
+      ruby_llm-mcp (~> 1.0)
+      ruby_llm-schema (~> 0.3)
+      ruby_llm-semantic_cache (~> 0.1)
+      simple_flow (~> 0.4)
+      typed_bus (~> 0.0.1)
+      zeitwerk (~> 2.6)
+    robot_lab-rails (0.2.8)
+      activejob (>= 7.0)
+      activesupport (>= 7.0)
+      railties (>= 7.0)
+      robot_lab (~> 0.2.0)
+    rubocop (1.91.0)
       json (>= 2.3)
       language_server-protocol (~> 3.17.0.2)
       lint_roller (~> 1.1.0)
@@ -511,7 +504,7 @@ GEM
       sexp_processor (~> 4.16)
     rubyzip (3.6.0)
     securerandom (0.4.1)
-    selenium-webdriver (4.48.0)
+    selenium-webdriver (4.49.0)
       base64 (~> 0.2)
       logger (~> 1.4)
       rexml (~> 3.2, >= 3.2.5)
@@ -629,8 +622,8 @@ DEPENDENCIES
   rails (~> 8.1.3)
   rails_best_practices
   reek
-  robot_lab!
-  robot_lab-rails!
+  robot_lab
+  robot_lab-rails
   rubocop
   rubocop-rails
   ruby-vips (~> 2.0)
@@ -665,7 +658,7 @@ CHECKSUMS
   anyway_config (2.8.1) sha256=541842b25117fac3e277670c32dc09d3b715b20404826a6538ac35527583624f
   ast (2.4.3) sha256=954615157c1d6a382bc27d690d973195e79db7f55e9765ac7c481c60bdb4d383
   async (2.45.1) sha256=95849f7432eca535146c69f3078dab3c7228d0075ed71f48733f3e585dd7c267
-  async-http (0.103.0) sha256=137e3d5d419f7d72d5fa33cf04f30232e79c57b690025a650b8f9e48ece8bc41
+  async-http (0.104.0) sha256=c5f436fe7778cee07031770b232d9feb412f1d80287a0b5dcbd1f6335a52ce6f
   async-pool (0.12.0) sha256=5580493dc024bd704dab2ed0bf1307100722e49cbb825c7965f8501194f58506
   async-websocket (0.30.1) sha256=54bb8a8f184e4aa64434c7a78ecc55850a67a3d1dcd02e3ae787376e2c673936
   base64 (0.3.0) sha256=27337aeabad6ffae05c265c450490628ef3ebd4b67be58257393227588f5a97b
@@ -719,14 +712,14 @@ CHECKSUMS
   fugit (1.13.0) sha256=a4f093fce740da52f216740a5041e2a594ea763cdb89e8b2754ca4399634ab18
   globalid (1.4.0) sha256=037f12fbf1d9d7a014d501c2d5c77356fd4ddd96d7a7991d6700bba96706f427
   hana (1.3.7) sha256=5425db42d651fea08859811c29d20446f16af196308162894db208cac5ce9b0d
-  herb (0.10.3-aarch64-linux-gnu) sha256=1eaea87e6577557492a1b0ddaae989fba8a8ddd382e888ee5f939ce6ded06eb8
-  herb (0.10.3-aarch64-linux-musl) sha256=4ac7ccd194f8f284ffc7bf093676f5194cf0f44ea4a7d3888eac095e81c43e1f
-  herb (0.10.3-arm-linux-gnu) sha256=d5f007b665a705b5566f1068b54e1600d5ffe6cb0b7d274e27dd7ed5918ca54e
-  herb (0.10.3-arm-linux-musl) sha256=09a0979f64ee3aff0b25a345c2cecd15992a0532295fd00249d73f13a3e313b1
-  herb (0.10.3-arm64-darwin) sha256=1a5bef57d925d775496328e7a01a9c1260e1d83bed8038b60a4f8c81b12c15a3
-  herb (0.10.3-x86_64-darwin) sha256=e02e43b3bb1977f4fd08f3330b5f2aa3292ca2d572a8bd59688eca8b79725f46
-  herb (0.10.3-x86_64-linux-gnu) sha256=cbb49b66f2bdc92d17109d1ea9452e88ba6a8ae52e9ddd5279deff83dcc4c66d
-  herb (0.10.3-x86_64-linux-musl) sha256=c84482d6b57f13c2e1a0fa029649efb0e5fdc876a3fd564bae09cf42bd4d5ae1
+  herb (0.10.4-aarch64-linux-gnu) sha256=6691f620624dc0340c0bd35d157e7def75ec2f649ad2b7fb1c63271ea1499b79
+  herb (0.10.4-aarch64-linux-musl) sha256=19ce7e56ca60691dc517b77a60b791e867438f91a92e12884af828a260a0cae8
+  herb (0.10.4-arm-linux-gnu) sha256=1bde355562145cdb93c24cabe91bb136127cd8faad2a6d60433c93ebcf5c1c50
+  herb (0.10.4-arm-linux-musl) sha256=b685757ae583066464a62a3bff4d6fb8f850f18b253f29c6eefd1ce847b07598
+  herb (0.10.4-arm64-darwin) sha256=3842480fbe9f7a14368bfe76405f49bad75be4b2a99f9ddec5b50cbf44b245ba
+  herb (0.10.4-x86_64-darwin) sha256=50d522b19732e38a9c6f332e1ffaf70054ad2eca9395dd3bb81dde1f73cb2e67
+  herb (0.10.4-x86_64-linux-gnu) sha256=36591472b92e0f601e512b108bf25dbb761f32636703cb79d3f5388425476b1b
+  herb (0.10.4-x86_64-linux-musl) sha256=3b5fc05c0224f156bb05993703c309d53c52a1385d37c65a956cb4d40695d70c
   http-2 (1.2.2) sha256=81b5d45f50fd4cd5f8c5d09651184bec9401e3ef169c3eb3e5b003d5614a92b9
   httpx (1.8.3) sha256=cb88f2285c4ef17164d803a640dc393d28722cba7f282ad0e7f9f926cd02dc47
   i18n (1.15.2) sha256=00f9eb62412fe593b2a65a97daa75300d37abb8f7202ec748e94b6d46a9dd1b5
@@ -755,7 +748,7 @@ CHECKSUMS
   multipart-post (2.4.1) sha256=9872d03a8e552020ca096adadbf5e3cb1cd1cdd6acd3c161136b8a5737cdb4a8
   myway_config (0.1.2) sha256=c91741ded05babc443fcf5d012741ded8a1a1998c40a689cb32af27940b66be3
   net-http (0.9.1) sha256=25ba0b67c63e89df626ed8fac771d0ad24ad151a858af2cc8e6a716ca4336996
-  net-imap (0.6.6) sha256=96aa4ee50df3060203e649efc341f53480b791d49e150f2fdebf68beb141a8df
+  net-imap (0.6.7) sha256=b5c9573be975d856de252ee851871724da66aa2d449b2482d5690bd12bc23660
   net-pop (0.1.2) sha256=848b4e982013c15b2f0382792268763b748cce91c9e91e36b0f27ed26420dff3
   net-protocol (0.3.0) sha256=ba310c3d4f1cad46bb1ab20336b06669b1ff8f7c568d9cb9342b32a718547472
   net-smtp (0.5.1) sha256=ed96a0af63c524fceb4b29b0d352195c30d82dd916a42f03c62a3a70e5b70736
@@ -786,7 +779,7 @@ CHECKSUMS
   protocol-http (0.71.0) sha256=38577bf3df0bf0c3f7ee7e21b43fcb4bd7624e36f697dbe9c3eea344f14bd9ba
   protocol-http1 (0.41.0) sha256=9863874a1228948a896c3e7ea16d13a680c8f3ed50706007c78b7033018b0ea3
   protocol-http2 (0.28.0) sha256=b7c6195dcfa80ec2484670e9fd8fc21024cc654a391aa0792433aff1188c1691
-  protocol-rack (0.22.1) sha256=1185d245927ef9849a603700d6991ca353bc89724fbf98efa4a4333ed62a9fc3
+  protocol-rack (0.23.0) sha256=63eec3341b20565b3dd155345fd1426ecbbed322cdc8a6accc993905388c03d7
   protocol-url (0.19.0) sha256=3f6b9f6aa742a259a0b3610fbbd9685dcd9506adf6734f428ff96259faabfb21
   protocol-websocket (0.21.2) sha256=cbe35be8e045597b221874fba5928d7cd2483884126e3e36faece4741dc88eb7
   public_suffix (7.0.5) sha256=1a8bb08f1bbea19228d3bed6e5ed908d1cb4f7c2726d18bd9cadf60bc676f623
@@ -813,9 +806,9 @@ CHECKSUMS
   require_all (3.0.0) sha256=937853faa2833388eab551107bf7bf87c6bba6b4800bac5ce469eda7b6a9fed0
   rexml (3.4.4) sha256=19e0a2c3425dfbf2d4fc1189747bdb2f849b6c5e74180401b15734bc97b5d142
   rice (4.12.0) sha256=672c369ca706ff5be46695537f51e1a3db262c1b789af5b967ef477f25111dfd
-  robot_lab (0.2.8)
-  robot_lab-rails (0.2.8)
-  rubocop (1.90.0) sha256=9eb4c065b5c5154e4ef554c547972f3905a9eb6b53e657e580b6796b54bf8242
+  robot_lab (0.2.8) sha256=01873fb8b4f0cfa5d28261d9a81b6de83c5edf10230c9b8731cf8f64eee5bec9
+  robot_lab-rails (0.2.8) sha256=47dd07650d55bd2c073ca41dadb0a7a24963997c53acad8aa458a195b405e897
+  rubocop (1.91.0) sha256=9c82b7bf391c5d7e3798c5b9996e22a1fe3bd7468e351dfdeb96140c058296d0
   rubocop-ast (1.50.0) sha256=b9ca88300da0803ee222ad20cdb30494c0a784eed06fdc35d254b06d662788db
   rubocop-rails (2.37.0) sha256=6e1645add5060e0328f8ddda0d820f55697c591394398bf14bb9dccb62f14b7e
   ruby-next-core (1.2.1) sha256=ddba3e986e127143299a26bde8bdbeedd4bc738a1a765e499f9634f361551f79
@@ -828,7 +821,7 @@ CHECKSUMS
   ruby_parser (3.22.0) sha256=1eb4937cd9eb220aa2d194e352a24dba90aef00751e24c8dfffdb14000f15d23
   rubyzip (3.6.0) sha256=268994d44d62282d1cfd99bf10eae48d7267199158ad7ea3e1fee2da9458b695
   securerandom (0.4.1) sha256=cc5193d414a4341b6e225f0cb4446aceca8e50d5e1888743fac16987638ea0b1
-  selenium-webdriver (4.48.0) sha256=0c8376ebc8a0a4879343fe6fe6eccdcea76748611cd25de370b33eded2077a94
+  selenium-webdriver (4.49.0) sha256=b430f091a3cababb356b6f6132e0e4f385b017819355f563557e1537819edc89
   sexp_processor (4.17.5) sha256=ae2b48ba98353d5d465ce8759836b7a05f2e12c5879fcd14d7815b026de32f0e
   simple_flow (0.4.0) sha256=20690b39bd0895ff6085b7011454d38d80bb4602518aaf23ace714c5dfc55bcd
   simplecov (1.2.0) sha256=ea6acd05eece5a41990e2a5171c57d15700d329326c7666c85ee8c6a0dd0977e
