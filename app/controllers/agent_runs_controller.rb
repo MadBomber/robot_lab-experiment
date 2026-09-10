@@ -17,7 +17,7 @@ class AgentRunsController < ApplicationController
 
   def show
     @agent_run = task.agent_runs.find(params[:id])
-    @messages = Message.where(conversation_id: agent_run.conversation_id).order(:created_at, :seq)
+    @messages = Message.where(conversation_id: agent_run.conversation_id).order(:seq)
   end
 
   private
