@@ -38,10 +38,11 @@ unless File.basename(ENV.fetch("BUNDLE_GEMFILE", "Gemfile")) == "Gemfile.local"
   gem "robot_lab-rails"
 end
 
-# json 3.x is incompatible with activesupport 8.1.3.1 (JSON.parse options are
-# keyword-only in json 3; AS still passes a positional hash) -- drop this pin
-# once Rails ships a fix.
-gem "json", "~> 2.21"
+# json 3.x makes JSON.parse options keyword-only; activesupport 8.1.3.1 still
+# passes a positional hash. Rails fixed this on 8-1-stable but hasn't released
+# it, so config/initializers/active_support_json3_compat.rb carries the
+# backport until Rails > 8.1.3.1 ships (then delete that initializer).
+gem "json", "~> 3.0"
 
 # Use the database-backed adapters for Rails.cache, Active Job, and Action Cable
 gem "ruby_llm"
