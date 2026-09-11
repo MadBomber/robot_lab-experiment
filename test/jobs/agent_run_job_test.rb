@@ -138,12 +138,7 @@ class AgentRunJobTest < ActiveSupport::TestCase
   end
 
   test "gives the planning agent read/search tools plus the planning completion tool" do
-    planning_run = AgentRun.create!(
-      task: @task,
-      conversation: Conversation.create!(task: @task, provider: "ollama", model: "qwen3.6:latest", started_at: Time.current),
-      agent_type: "planning",
-      status: "running"
-    )
+    planning_run = start_run("planning")
 
     captured = nil
     RobotLab.stub(:build, lambda { |**kwargs|
@@ -159,12 +154,7 @@ class AgentRunJobTest < ActiveSupport::TestCase
   end
 
   test "gives the pr agent bash plus the pr completion tool" do
-    pr_run = AgentRun.create!(
-      task: @task,
-      conversation: Conversation.create!(task: @task, provider: "ollama", model: "qwen3.6:latest", started_at: Time.current),
-      agent_type: "pr",
-      status: "running"
-    )
+    pr_run = start_run("pr")
 
     captured = nil
     RobotLab.stub(:build, lambda { |**kwargs|
@@ -179,12 +169,7 @@ class AgentRunJobTest < ActiveSupport::TestCase
   end
 
   test "gives the review agent the workflow completion tools but not the planning one" do
-    review_run = AgentRun.create!(
-      task: @task,
-      conversation: Conversation.create!(task: @task, provider: "ollama", model: "qwen3.6:latest", started_at: Time.current),
-      agent_type: "review",
-      status: "running"
-    )
+    review_run = start_run("review")
 
     captured = nil
     RobotLab.stub(:build, lambda { |**kwargs|
@@ -200,12 +185,7 @@ class AgentRunJobTest < ActiveSupport::TestCase
   end
 
   test "gives the audit agent issue-filing tools, no completion tools" do
-    audit_run = AgentRun.create!(
-      task: @task,
-      conversation: Conversation.create!(task: @task, provider: "ollama", model: "qwen3.6:latest", started_at: Time.current),
-      agent_type: "audit",
-      status: "running"
-    )
+    audit_run = start_run("audit")
 
     captured = nil
     RobotLab.stub(:build, lambda { |**kwargs|
@@ -226,10 +206,17 @@ class AgentRunJobTest < ActiveSupport::TestCase
   # point (RobotLab connects/injects/disconnects the MCP clients itself).
 
   def review_run
+    start_run("review")
+  end
+
+  # Materializes a running run of the given type. The partial unique index
+  # allows only one running run per task, so setup's run is retired first.
+  def start_run(agent_type)
+    @agent_run.update!(status: "completed")
     AgentRun.create!(
       task: @task,
       conversation: Conversation.create!(task: @task, provider: "ollama", model: "qwen3.6:latest", started_at: Time.current),
-      agent_type: "review",
+      agent_type:,
       status: "running"
     )
   end
