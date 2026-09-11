@@ -26,7 +26,7 @@ class TasksController < ApplicationController
 
   def show
     @doc_content = TaskDocument.read(task)
-    @messages = Message.where(conversation_id: task.conversation_ids).order(:created_at, :seq)
+    @messages = Message.where(conversation_id: task.conversation_ids).order(:conversation_id, :seq)
   end
 
   def destroy
