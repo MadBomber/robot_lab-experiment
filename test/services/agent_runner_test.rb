@@ -2,8 +2,7 @@ require "test_helper"
 
 class AgentRunnerTest < ActiveSupport::TestCase
   def setup
-    @repo_dir = Dir.mktmpdir("agent_runner_test_repo")
-    Dir.chdir(@repo_dir) { system("git", "init", "--quiet") }
+    @repo_dir = init_git_repo("agent_runner_test_repo")
     project = Project.create!(name: "Demo", repo_folder_path: @repo_dir)
     @task = Task.create!(project:, title: "Do the thing")
   end
@@ -64,8 +63,10 @@ class AgentRunnerTest < ActiveSupport::TestCase
     AgentRunner.start_agent_run(@task, :planning)
 
     @task.stub(:running_agent_run, nil) do
-      assert_raises(AgentRunner::AlreadyRunningError) do
-        AgentRunner.start_agent_run(@task, :implementation)
+      assert_no_enqueued_jobs(only: AgentRunJob) do
+        assert_raises(AgentRunner::AlreadyRunningError) do
+          AgentRunner.start_agent_run(@task, :implementation)
+        end
       end
     end
   end
@@ -75,8 +76,10 @@ class AgentRunnerTest < ActiveSupport::TestCase
 
     @task.stub(:running_agent_run, nil) do
       assert_no_difference -> { @task.reload.conversations.count } do
-        assert_raises(AgentRunner::AlreadyRunningError) do
-          AgentRunner.start_agent_run(@task, :implementation)
+        assert_no_enqueued_jobs(only: AgentRunJob) do
+          assert_raises(AgentRunner::AlreadyRunningError) do
+            AgentRunner.start_agent_run(@task, :implementation)
+          end
         end
       end
     end
@@ -87,11 +90,26 @@ class AgentRunnerTest < ActiveSupport::TestCase
 
     @task.stub(:running_agent_run, nil) do
       assert_no_difference -> { @task.reload.workflow_run_count } do
-        assert_raises(AgentRunner::AlreadyRunningError) do
-          AgentRunner.start_agent_run(@task, :implementation)
+        assert_no_enqueued_jobs(only: AgentRunJob) do
+          assert_raises(AgentRunner::AlreadyRunningError) do
+            AgentRunner.start_agent_run(@task, :implementation)
+          end
         end
       end
     end
+  end
+
+  test "the losing task object does not keep a stale in-memory workflow_run_count" do
+    AgentRunner.start_agent_run(@task, :planning)
+    before = @task.workflow_run_count
+
+    @task.stub(:running_agent_run, nil) do
+      assert_raises(AgentRunner::AlreadyRunningError) do
+        AgentRunner.start_agent_run(@task, :implementation)
+      end
+    end
+
+    assert_equal before, @task.workflow_run_count
   end
 
   test "accepts an explicit provider and model override" do

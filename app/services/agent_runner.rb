@@ -24,6 +24,24 @@ class AgentRunner
   def start_agent_run(agent_type, provider: nil, model: nil)
     raise AlreadyRunningError, "task #{@task.id} already has a running agent" if @task.running_agent_run
 
+    agent_run = create_agent_run!(agent_type, provider:, model:)
+
+    # Enqueued only after the transaction commits: Solid Queue lives in a
+    # separate database, so an enqueue inside the block would neither roll
+    # back with it nor wait for it -- a worker polling every ~0.1s could pick
+    # the job up before the run row exists and fail it permanently, leaving
+    # the run stuck at "running" with nothing driving it.
+    AgentRunJob.perform_later(agent_run.id)
+    agent_run
+  end
+
+  private
+
+  # The check in start_agent_run is only a fast path -- the real arbiter is
+  # the partial unique index (one "running" AgentRun per task), surfacing here
+  # as RecordNotUnique when two starts race. The transaction keeps the loser
+  # side-effect-free: no orphan Conversation, no counter bump.
+  def create_agent_run!(agent_type, provider:, model:)
     @task.transaction do
       @task.increment!(:workflow_run_count)
 
@@ -34,15 +52,13 @@ class AgentRunner
         task: @task, conversation:, agent_type: agent_type.to_s, status: "running"
       )
       @task.recompute_status!
-
-      AgentRunJob.perform_later(agent_run.id)
       agent_run
     end
   rescue ActiveRecord::RecordNotUnique
+    # The rollback reverted the DB but not the in-memory counter bump.
+    @task.reload
     raise AlreadyRunningError, "task #{@task.id} already has a running agent"
   end
-
-  private
 
   def effective_provider(override = nil)
     override.presence || @task.llm_provider.presence || DEFAULT_PROVIDER
