@@ -2,15 +2,10 @@ require "test_helper"
 
 class ProjectTest < ActiveSupport::TestCase
   def setup
-    @repo_dir = Dir.mktmpdir("project_test_repo")
-    Dir.chdir(@repo_dir) do
-      system("git", "init", "--quiet")
-      system("git", "config", "user.email", "test@example.com")
-      system("git", "config", "user.name", "Test User")
-      File.write("README.md", "hello")
-      system("git", "add", ".")
-      system("git", "commit", "-m", "initial", "--quiet")
-    end
+    # Bare init only -- validation just looks for a .git entry. The two
+    # worktree tests add the commit scaffold themselves (`git worktree add`
+    # needs a HEAD); the other tests shouldn't pay for it.
+    @repo_dir = init_git_repo("project_test_repo")
   end
 
   def teardown
@@ -23,14 +18,30 @@ class ProjectTest < ActiveSupport::TestCase
   end
 
   test "valid with a git worktree path" do
+    commit_git_scaffold(@repo_dir)
     worktree_dir = Dir.mktmpdir("project_test_worktree")
-    system("git", "-C", @repo_dir, "worktree", "add", "--quiet", worktree_dir)
+    git! @repo_dir, "worktree", "add", "--quiet", worktree_dir
 
     project = Project.new(name: "Worktree Demo", repo_folder_path: worktree_dir)
     assert project.valid?, project.errors.full_messages
   ensure
-    system("git", "-C", @repo_dir, "worktree", "remove", "--force", worktree_dir) if worktree_dir
-    FileUtils.remove_entry(worktree_dir) if worktree_dir && Dir.exist?(worktree_dir)
+    if worktree_dir
+      git! @repo_dir, "worktree", "remove", "--force", worktree_dir
+      FileUtils.rm_rf(worktree_dir)
+    end
+  end
+
+  test "invalid when the path is a task worktree inside a managed container" do
+    commit_git_scaffold(@repo_dir)
+    container = "#{@repo_dir}-worktrees"
+    worktree_dir = File.join(container, "task-99")
+    git! @repo_dir, "worktree", "add", "--quiet", worktree_dir
+
+    project = Project.new(name: "Hijack", repo_folder_path: worktree_dir)
+    assert_not project.valid?
+    assert_includes project.errors[:repo_folder_path], "is a task worktree managed by another project"
+  ensure
+    FileUtils.rm_rf(container)
   end
 
   test "invalid when repo_folder_path is not a git repo" do
