@@ -121,6 +121,28 @@ class TasksControllerTest < ActionDispatch::IntegrationTest
     assert_select "turbo-cable-stream-source", count: 1
   end
 
+  test "show orders transcript by conversation then seq regardless of created_at skew" do
+    task = Task.create!(project: @project, title: "Add login")
+    first_conversation = Conversation.create!(task:, provider: "ollama", model: "qwen3.6:latest", started_at: 2.hours.ago)
+    second_conversation = Conversation.create!(task:, provider: "ollama", model: "qwen3.6:latest", started_at: 1.hour.ago)
+
+    Message.create!(conversation: first_conversation, msg_type: :user, seq: 1, uuid: SecureRandom.uuid,
+                    created_at: 2.hours.ago, payload: { content: "run 1 first" })
+    Message.create!(conversation: first_conversation, msg_type: :assistant, seq: 2, uuid: SecureRandom.uuid,
+                    created_at: 1.hour.ago, payload: { content: "run 1 second" })
+    Message.create!(conversation: second_conversation, msg_type: :user, seq: 1, uuid: SecureRandom.uuid,
+                    created_at: 3.hours.ago, payload: { content: "run 2 first" })
+    Message.create!(conversation: second_conversation, msg_type: :assistant, seq: 2, uuid: SecureRandom.uuid,
+                    created_at: 4.hours.ago, payload: { content: "run 2 second" })
+
+    get project_task_url(@project, task)
+
+    assert_response :success
+    message_ids = css_select('[data-slot="message-scroller-item"]').map { |el| el["data-message-id"].to_i }
+    expected_ids = first_conversation.messages.order(:seq).map(&:id) + second_conversation.messages.order(:seq).map(&:id)
+    assert_equal expected_ids, message_ids
+  end
+
   test "show renders blocked detail and a link to the blocking run transcript" do
     task = Task.create!(project: @project, title: "Stuck", blocked_reason: "no_progress",
                         blocked_detail: "No progress: repeated the same tool call 4 times during run #1 (implementation)",

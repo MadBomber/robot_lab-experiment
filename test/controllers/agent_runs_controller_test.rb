@@ -36,4 +36,20 @@ class AgentRunsControllerTest < ActionDispatch::IntegrationTest
     assert_equal "Invalid agent type: yolo", flash[:alert]
     assert_not @task.reload.running_agent_run.present?
   end
+
+  test "show orders transcript messages by seq regardless of created_at skew" do
+    conversation = Conversation.create!(task: @task, provider: "ollama", model: "qwen3.6:latest", started_at: Time.current)
+    run = AgentRun.create!(task: @task, conversation:, agent_type: "implementation", status: "completed")
+
+    first = Message.create!(conversation:, msg_type: :user, seq: 1, uuid: SecureRandom.uuid,
+                            created_at: 2.hours.ago, payload: { content: "first" })
+    second = Message.create!(conversation:, msg_type: :assistant, seq: 2, uuid: SecureRandom.uuid,
+                             created_at: 3.hours.ago, payload: { content: "second" })
+
+    get project_task_agent_run_url(@project, @task, run)
+
+    assert_response :success
+    labels = css_select('pre[data-slot="code-block-pre"]').map { |el| el["aria-label"] }
+    assert_equal ["Message #{first.id} payload", "Message #{second.id} payload"], labels
+  end
 end
