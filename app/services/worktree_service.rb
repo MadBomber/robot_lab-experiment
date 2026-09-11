@@ -74,24 +74,18 @@ class WorktreeService
   # which pins the answer to the main checkout no matter which worktree
   # repo_folder_path points at (for a normal checkout it's the same .git).
   def main_worktree_head
-    common_dir, _err, status = run("git", "rev-parse", "--path-format=absolute", "--git-common-dir",
-                                   chdir: @project.repo_folder_path)
-    return unless status.success?
+    common_dir = run_for_stdout("git", "rev-parse", "--path-format=absolute", "--git-common-dir",
+                                chdir: @project.repo_folder_path)
+    return unless common_dir
 
-    head, _err, head_status = run("git", "--git-dir", common_dir.strip, "symbolic-ref", "--short", "HEAD",
-                                  chdir: @project.repo_folder_path)
-    return unless head_status.success?
-
-    head.strip.presence
+    run_for_stdout("git", "--git-dir", common_dir, "symbolic-ref", "--short", "HEAD",
+                   chdir: @project.repo_folder_path)
   end
 
   # The short name `git symbolic-ref` resolves for ref, or nil when the ref
   # doesn't resolve (e.g. no origin/HEAD in a local-only repo).
   def symbolic_ref(ref)
-    out, _err, status = Open3.capture3("git", "symbolic-ref", "--short", ref, chdir: @project.repo_folder_path)
-    return unless status.success?
-
-    out.strip.presence
+    run_for_stdout("git", "symbolic-ref", "--short", ref, chdir: @project.repo_folder_path)
   end
 
   def run!(*argv, chdir:)
@@ -101,5 +95,12 @@ class WorktreeService
 
   def run(*argv, chdir:)
     Open3.capture3(*argv, chdir: chdir)
+  end
+
+  # Stripped stdout when the command succeeds, nil when it fails or prints
+  # nothing -- for callers that treat failure as "no answer".
+  def run_for_stdout(*argv, chdir:)
+    out, _err, status = run(*argv, chdir: chdir)
+    out.strip.presence if status.success?
   end
 end

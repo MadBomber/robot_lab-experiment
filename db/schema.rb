@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_10_175144) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_11_000000) do
   create_table "agent_runs", force: :cascade do |t|
     t.string "agent_type", null: false
     t.boolean "cancel_requested", default: false, null: false
@@ -80,7 +80,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_10_175144) do
     t.string "worktree_path"
     t.index ["blocked_run_id"], name: "index_tasks_on_blocked_run_id"
     t.index ["project_id", "github_issue_number"], name: "index_tasks_on_project_id_and_github_issue_number"
-    t.index ["project_id"], name: "index_tasks_on_project_id"
     t.index ["status"], name: "index_tasks_on_status"
   end
 
