@@ -65,7 +65,24 @@ class WorktreeService
     remote_head = symbolic_ref("refs/remotes/origin/HEAD")
     return remote_head.sub(%r{\Aorigin/}, "") if remote_head
 
-    symbolic_ref("HEAD") || "main"
+    main_worktree_head || "main"
+  end
+
+  # HEAD of the repository's *main* worktree. A bare `symbolic-ref HEAD` run
+  # from a linked worktree answers with that worktree's own checked-out
+  # branch — not a repository default — so resolve through --git-common-dir,
+  # which pins the answer to the main checkout no matter which worktree
+  # repo_folder_path points at (for a normal checkout it's the same .git).
+  def main_worktree_head
+    common_dir, _err, status = run("git", "rev-parse", "--path-format=absolute", "--git-common-dir",
+                                   chdir: @project.repo_folder_path)
+    return unless status.success?
+
+    head, _err, head_status = run("git", "--git-dir", common_dir.strip, "symbolic-ref", "--short", "HEAD",
+                                  chdir: @project.repo_folder_path)
+    return unless head_status.success?
+
+    head.strip.presence
   end
 
   # The short name `git symbolic-ref` resolves for ref, or nil when the ref

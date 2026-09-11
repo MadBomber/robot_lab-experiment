@@ -3,15 +3,7 @@ require "open3"
 
 class WorktreeServiceTest < ActiveSupport::TestCase
   def setup
-    @repo_dir = Dir.mktmpdir("worktree_test_repo")
-    Dir.chdir(@repo_dir) do
-      system("git", "init", "--quiet")
-      system("git", "config", "user.email", "test@example.com")
-      system("git", "config", "user.name", "Test")
-      File.write("README.md", "hello")
-      system("git", "add", "README.md")
-      system("git", "commit", "--quiet", "-m", "initial commit")
-    end
+    @repo_dir = commit_git_scaffold(init_git_repo("worktree_test_repo"))
 
     @project = Project.create!(name: "Demo", repo_folder_path: @repo_dir)
     @task = Task.create!(project: @project, title: "Add a Login Page!")
@@ -78,6 +70,23 @@ class WorktreeServiceTest < ActiveSupport::TestCase
     end
 
     assert_not Dir.exist?(path)
+  end
+
+  test "default_branch resolves the main checkout's branch when the project is rooted at a linked worktree" do
+    git! @repo_dir, "branch", "-M", "main"
+    worktree_dir = Dir.mktmpdir("worktree_rooted_project")
+    git! @repo_dir, "worktree", "add", "--quiet", "-b", "feature-x", worktree_dir
+
+    project = Project.create!(name: "Worktree Rooted", repo_folder_path: worktree_dir)
+    task = Task.create!(project:, title: "From a worktree")
+
+    # Must be the main checkout's HEAD, not the worktree's own feature-x.
+    assert_equal "main", WorktreeService.new(task).send(:default_branch)
+  ensure
+    if worktree_dir
+      git! @repo_dir, "worktree", "remove", "--force", worktree_dir
+      FileUtils.rm_rf(worktree_dir)
+    end
   end
 
   test "remove tolerates git errors when the worktree directory is already gone" do
