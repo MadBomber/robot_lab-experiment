@@ -1,23 +1,28 @@
-<header id="task-header" class="flex flex-col gap-4 rounded-xl border border-border bg-card px-5 py-4">
-  <div class="flex flex-wrap items-center justify-between gap-4">
-    <div class="min-w-0">
-      <%= poetry_breadcrumb do |crumb| %>
-        <% crumb.with_item(project.name, href: project_path(project)) %>
-        <% crumb.with_item(task.title) %>
+<%# The task page's header: breadcrumb, title, the status WORD beside its
+    color (never color alone), the run counter, and -- for fix tasks -- the
+    pipeline tracker: poetry_timeline in its horizontal step-tracker mode,
+    each stage carrying its own status word. %>
+<header id="task-header" class="flex flex-col gap-4">
+  <%= poetry_breadcrumb do |crumb| %>
+    <% crumb.with_item("Projects", href: projects_path) %>
+    <% crumb.with_item(project.name, href: project_path(project)) %>
+    <% crumb.with_item(task.title) %>
+  <% end %>
+
+  <div class="flex flex-wrap items-start justify-between gap-4">
+    <h1 class="min-w-0 text-xl font-semibold tracking-tight"><%= task.title %></h1>
+    <div class="flex shrink-0 flex-wrap items-center gap-3">
+      <%= poetry_badge(variant: task_status_variant(task),
+            class: ("task-status-blocked" if task.blocked?)) do %>
+        <%= poetry_spinner(label: "Agent running", class: "size-3") if task.running_agent_run %>
+        <%= task_status_word(task) %><%=
+          if task.blocked?
+            " — #{task.blocked_reason.humanize.downcase}"
+          elsif task.running_agent_run
+            " — #{task.running_agent_run.agent_type}"
+          end %>
       <% end %>
-    </div>
-    <div class="flex flex-wrap items-center gap-2">
-      <% if task.blocked? %>
-        <%= poetry_badge(variant: :destructive, class: "task-status-blocked") { "blocked (#{task.blocked_reason})" } %>
-      <% elsif task.running_agent_run.present? %>
-        <%= poetry_badge(variant: :info) do %>
-          <%= poetry_spinner(label: "Agent running", class: "size-3") %>
-          <%= task.running_agent_run.agent_type %> running
-        <% end %>
-      <% else %>
-        <%= poetry_badge(variant: :outline) { task.status.humanize } %>
-      <% end %>
-      <span class="font-mono text-xs tabular-nums text-muted-foreground">runs <%= task.workflow_run_count %>/<%= Task::MAX_WORKFLOW_RUNS %></span>
+      <span class="font-mono text-xs tabular-nums text-muted-foreground">run <%= task.workflow_run_count %> of <%= Task::MAX_WORKFLOW_RUNS %></span>
     </div>
   </div>
 
@@ -32,34 +37,16 @@
   <% end %>
 
   <% if task.fix? %>
-    <nav aria-label="Pipeline progress" class="max-w-xl">
-      <ol class="flex items-center gap-3">
-        <% Task::PIPELINE_STAGES.each_with_index do |stage, index| %>
-          <% status = task.pipeline_stage_status(stage) %>
-          <% unless index.zero? %>
-            <li aria-hidden="true" class="h-px min-w-8 flex-1 <%= status == :pending ? "bg-border" : "bg-primary" %>"></li>
-          <% end %>
-          <% case status %>
-          <% when :done %>
-            <li class="flex items-center gap-2">
-              <span class="flex size-7 items-center justify-center rounded-full bg-primary text-primary-foreground">
-                <%= poetry_icon(name: :check, class: "size-4", label: "Completed") %>
-              </span>
-              <span class="text-sm font-medium"><%= stage.capitalize %></span>
-            </li>
-          <% when :active %>
-            <li aria-current="step" class="flex items-center gap-2">
-              <span class="flex size-7 items-center justify-center rounded-full border-2 border-primary text-sm font-semibold text-primary"><%= index + 1 %></span>
-              <span class="text-sm font-medium text-primary"><%= stage.capitalize %></span>
-            </li>
-          <% else %>
-            <li class="flex items-center gap-2">
-              <span class="flex size-7 items-center justify-center rounded-full border border-border text-sm text-muted-foreground"><%= index + 1 %></span>
-              <span class="text-sm text-muted-foreground"><%= stage.capitalize %></span>
-            </li>
-          <% end %>
+    <%= poetry_timeline(orientation: :horizontal, "aria-label": "Pipeline progress") do |timeline| %>
+      <% Task::PIPELINE_STAGES.each do |stage| %>
+        <% word, variant = pipeline_stage_badge(task, stage) %>
+        <% timeline.with_item(title: pipeline_stage_title(stage),
+              completed: task.pipeline_stage_status(stage) == :done) do %>
+          <%= poetry_badge(variant:) { word } %>
         <% end %>
-      </ol>
-    </nav>
+      <% end %>
+    <% end %>
   <% end %>
+
+  <%= poetry_separator %>
 </header>

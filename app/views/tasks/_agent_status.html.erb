@@ -1,17 +1,23 @@
+<%# The transcript's live footer. TranscriptRecorder broadcast-replaces this
+    partial (target "agent-status", locals running:/conversation:) at run
+    start/finish -- keep the root id and locals contract stable. The marker
+    is poetry's in-flight status row (announce: :status = the one live
+    role=status region), the word RUNNING beside its color per the hard
+    rules; the heartbeat controller ticks the elapsed clock client-side. %>
 <div id="agent-status">
   <% if running %>
-    <div class="mt-3 flex items-center gap-3 rounded-lg border border-dashed border-border px-4 py-3 text-sm text-muted-foreground"
+    <div class="mt-3"
       <% if local_assigns[:conversation] %>
         data-controller="heartbeat"
         data-heartbeat-started-at-value="<%= conversation.started_at&.iso8601 %>"
         data-heartbeat-count-value="<%= conversation.messages.count %>"
       <% end %>>
-      <%= poetry_spinner(label: "Agent working", class: "size-4 text-primary") %>
-      <span>
-        Agent working &middot;
+      <%= poetry_marker(variant: :default, announce: :status) do |marker| %>
+        <% marker.with_icon { poetry_spinner(label: "Agent working", class: "size-4") } %>
+        RUNNING — agent working &middot;
         <span class="font-mono tabular-nums" data-heartbeat-target="elapsed">...</span> &middot;
         <span class="font-mono tabular-nums" data-heartbeat-target="count"><%= local_assigns[:conversation] ? conversation.messages.count : 0 %></span> messages
-      </span>
+      <% end %>
     </div>
   <% end %>
 </div>

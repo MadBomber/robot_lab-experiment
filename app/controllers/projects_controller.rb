@@ -20,7 +20,7 @@ class ProjectsController < ApplicationController
 
   def show
     @project = Project.find(params[:id])
-    @tasks = project.tasks.order(created_at: :desc)
+    @tasks = project.tasks.includes(:agent_runs).order(created_at: :desc)
     @open_issues = GithubIssueService.list(project)
     # Issue number -> the most recent task created from that issue (tasks are
     # newest-first), so the issues list can show pipeline status instead of

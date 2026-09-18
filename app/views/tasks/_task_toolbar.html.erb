@@ -1,0 +1,53 @@
+<%# The task's command row: run-state actions up front, destructive
+    "abandon" demoted behind the More-actions menu (hidden form + the menu
+    item's form= attribute), and the run meter as the right-hand readout.
+    AgentRunCompletionHandler broadcast-replaces this partial (target
+    "task-toolbar") whenever the run-state actions change -- keep the root
+    id and the task:/project: locals contract stable. %>
+<div id="task-toolbar">
+<div class="mt-4 flex flex-wrap items-center gap-2" role="group" aria-label="Task commands">
+  <% if task.running_agent_run.present? %>
+    <%= form_with url: stop_project_task_path(project, task), method: :post, class: "inline" do %>
+      <%= poetry_button(variant: :destructive, size: :sm, type: :submit) do |button| %>
+        <% button.with_leading { poetry_icon(name: :square) } %>
+        Stop
+      <% end %>
+    <% end %>
+    <%= form_with url: pause_project_task_path(project, task), method: :post, class: "inline" do %>
+      <%= poetry_button(variant: :outline, size: :sm, type: :submit) do |button| %>
+        <% button.with_leading { poetry_icon(name: :pause) } %>
+        Pause
+      <% end %>
+    <% end %>
+  <% end %>
+
+  <% task.runnable_agent_types.each do |agent_type| %>
+    <%= form_with url: project_task_agent_runs_path(project, task), method: :post, class: "inline" do %>
+      <%= hidden_field_tag :agent_type, agent_type %>
+      <%= poetry_button(size: :sm, type: :submit) do |button| %>
+        <% button.with_leading { poetry_icon(name: :play) } %>
+        Run <%= agent_type %>
+      <% end %>
+    <% end %>
+  <% end %>
+
+  <% if task.blocked? %>
+    <%= form_with url: unblock_project_task_path(project, task), method: :post, class: "inline" do %>
+      <%= poetry_button(variant: :outline, size: :sm, type: :submit) { "Resume" } %>
+    <% end %>
+  <% end %>
+
+  <% unless task.completed? || task.blocked_reason == "abandoned" %>
+    <%= poetry_dropdown_menu(align: :start) do |menu| %>
+      <% menu.with_trigger(variant: :outline, size: :sm, label: "More actions") { poetry_icon(name: :ellipsis) } %>
+      <% menu.with_item(submit: abandon_project_task_path(project, task), method: :post, variant: :destructive,
+           data: { turbo_confirm: "Give up on this task and stop all agents?" }) { "Abandon task" } %>
+    <% end %>
+  <% end %>
+
+  <div class="ms-auto w-56">
+    <%= poetry_meter(label: "Workflow runs", value: task.workflow_run_count, max: Task::MAX_WORKFLOW_RUNS,
+          value_text: "#{task.workflow_run_count} of #{Task::MAX_WORKFLOW_RUNS}") %>
+  </div>
+</div>
+</div>

@@ -1,7 +1,7 @@
 class CreateMessages < ActiveRecord::Migration[8.1]
   def change
     create_table :messages do |t|
-      t.references :conversation, null: false, foreign_key: true
+      t.references :conversation, null: false, foreign_key: true, index: false
 
       # Idempotent append: retried/duplicated streaming events upsert on uuid.
       t.string :uuid, null: false

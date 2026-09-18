@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_11_000000) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_11_120005) do
   create_table "agent_runs", force: :cascade do |t|
     t.string "agent_type", null: false
     t.boolean "cancel_requested", default: false, null: false

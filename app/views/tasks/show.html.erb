@@ -1,23 +1,95 @@
+<%# Sidebar navigation for this page: the project's tasks in attention
+    order, each led by its status WORD -- one-click jumps between siblings
+    while the fleet-wide "Needs you" queue stays pinned above. %>
+<% content_for :sidebar_nav do %>
+  <section aria-labelledby="sidebar-tasks-heading" class="space-y-3">
+    <h2 id="sidebar-tasks-heading" class="font-mono text-xs uppercase tracking-widest text-muted-foreground">
+      <%= @project.name %> — tasks
+    </h2>
+    <%= poetry_item_group do %>
+      <% tasks_by_attention(@project_tasks).each_with_index do |sibling, index| %>
+        <%= poetry_item_separator(key: sibling) if index.positive? %>
+        <%= poetry_item(size: :sm, role: "listitem", tag: :a,
+              href: project_task_path(@project, sibling),
+              "aria-current": (sibling == @task ? "page" : nil)) do |item| %>
+          <% item.with_header do %>
+            <%= poetry_badge(variant: task_status_variant(sibling)) { task_status_word(sibling) } %>
+          <% end %>
+          <% item.with_title do %>
+            <span class="<%= "font-semibold" if sibling == @task %>"><%= sibling.title %></span>
+          <% end %>
+        <% end %>
+      <% end %>
+    <% end %>
+  </section>
+<% end %>
+
 <div class="w-full">
   <%= render "task_header", task: @task, project: @project %>
+  <%= render "task_toolbar", task: @task, project: @project %>
 
-  <div class="mt-5 grid items-start gap-5 lg:grid-cols-[18rem_minmax(0,1fr)]">
-    <%= render "task_controls", task: @task, project: @project, doc_content: @doc_content %>
+  <%= turbo_stream_from "task_#{@task.id}" %>
 
-    <section class="min-w-0" data-controller="transcript">
-      <div class="mb-3 flex items-center justify-between">
-        <span class="font-mono text-xs uppercase tracking-widest text-muted-foreground">Transcript</span>
-        <%= poetry_toggle(variant: :outline, size: :sm,
-              data: { action: "poetry:toggle:change->transcript#syncCollapsed" }) { "Collapse tool calls" } %>
+  <%= poetry_tabs(label: "Task workspace", default: "transcript", variant: :line, class: "mt-6") do |tabs| %>
+    <% tabs.with_tab("Transcript", value: "transcript") do %>
+      <section data-controller="transcript" class="mt-3">
+        <div class="mb-3 flex items-center justify-between">
+          <span class="font-mono text-xs uppercase tracking-widest text-muted-foreground"><%= @messages.size %> messages</span>
+          <%= poetry_toggle(variant: :outline, size: :sm,
+                data: { action: "poetry:toggle:change->transcript#syncCollapsed" }) { "Collapse tool calls" } %>
+        </div>
+        <%= poetry_message_scroller(id: "transcript", class: "h-[62vh]") do %>
+          <%= render partial: "messages/message", collection: @messages, as: :message %>
+        <% end %>
+        <%= render "tasks/agent_status", running: @task.running_agent_run.present?,
+              conversation: @task.running_agent_run&.conversation %>
+      </section>
+    <% end %>
+
+    <% tabs.with_tab("Task doc", value: "doc") do %>
+      <div class="mt-3">
+        <%= poetry_code_block(code: @doc_content.presence || "(empty)", language: "markdown",
+              label: "Task doc", class: "max-h-[62vh] overflow-y-auto") %>
       </div>
+    <% end %>
 
-      <%= turbo_stream_from "task_#{@task.id}" %>
-      <%= poetry_message_scroller(id: "transcript", class: "h-[70vh]") do %>
-        <%= render partial: "messages/message", collection: @messages, as: :message %>
-      <% end %>
+    <% tabs.with_tab("Guidance", value: "guidance") do %>
+      <div class="mt-3 max-w-xl space-y-6">
+        <% unless @task.completed? %>
+          <div class="space-y-2">
+            <% if @task.pending_guidance? %>
+              <p class="text-xs text-muted-foreground">Queued for the next run: <em><%= @task.pending_guidance %></em></p>
+            <% end %>
+            <%# poetry_webmcp_form declares this form as a WebMCP tool so a
+                browser agent can queue guidance; a person submits it as before
+                (mutating forms always keep the human's Submit). %>
+            <%= poetry_webmcp_form(url: guide_project_task_path(@project, @task), method: :post,
+                  tool: { name: "give_agent_guidance",
+                          description: "Queue guidance that steers this task's next agent run." },
+                  class: "space-y-2") do %>
+              <%= poetry_field(id: "task_guidance", label_text: "Guidance",
+                    hint: "Applied on the next run. To redirect an in-flight run, Stop it first.") do |field| %>
+                <%= poetry_textarea(name: "guidance", rows: 3,
+                      placeholder: "e.g. use the Playwright MCP server, not Selenium",
+                      **field.control_attributes) %>
+              <% end %>
+              <%= poetry_button(type: :submit) { "Queue guidance" } %>
+            <% end %>
+          </div>
+          <%= poetry_separator %>
+        <% end %>
 
-      <%= render "tasks/agent_status", running: @task.running_agent_run.present?,
-            conversation: @task.running_agent_run&.conversation %>
-    </section>
-  </div>
+        <%= form_with url: update_status_project_task_path(@project, @task), method: :patch,
+              class: "flex flex-wrap items-end gap-2" do %>
+          <%= poetry_field(id: "task_status_override", label_text: "Override status",
+                hint: "The pipeline recomputes this on its own; override only to correct it.") do |field| %>
+            <%= poetry_native_select(name: "status", size: :sm,
+                  options: Task.statuses.keys.map { |s| [s.humanize, s] }, selected: @task.status,
+                  **field.control_attributes) %>
+          <% end %>
+          <%= poetry_button(variant: :secondary, size: :sm, type: :submit) { "Set" } %>
+        <% end %>
+      </div>
+    <% end %>
+  <% end %>
 </div>

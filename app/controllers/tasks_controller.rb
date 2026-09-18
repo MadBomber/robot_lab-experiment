@@ -27,6 +27,9 @@ class TasksController < ApplicationController
   def show
     @doc_content = TaskDocument.read(task)
     @messages = Message.where(conversation_id: task.conversation_ids).order(:conversation_id, :seq)
+    # Sibling tasks for the sidebar's per-task navigation (agent_runs
+    # preloaded so the status words don't query per row).
+    @project_tasks = project.tasks.includes(:agent_runs).order(created_at: :desc)
   end
 
   def destroy

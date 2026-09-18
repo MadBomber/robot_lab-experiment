@@ -115,10 +115,11 @@ class AgentRunCompletionHandler
     no_chain(action)
   end
 
-  # Both the stepper/status pill (task-header) and the sidebar's action
-  # buttons (task-sidebar, e.g. "Run implementation" appearing once planning
-  # stops for review) depend on the same Task state -- refresh both together
-  # whenever it changes, so nobody has to reload the page to see them.
+  # Both the pipeline tracker/status word (task-header) and the command
+  # row's action buttons (task-toolbar, e.g. "Run implementation" appearing
+  # once planning stops for review) depend on the same Task state -- refresh
+  # both together whenever it changes, so nobody has to reload the page to
+  # see them.
   def broadcast_task_header(action, next_agent_run)
     return unless defined?(Turbo::StreamsChannel)
 
@@ -134,9 +135,9 @@ class AgentRunCompletionHandler
 
     Turbo::StreamsChannel.broadcast_replace_to(
       stream,
-      target: "task-sidebar",
-      partial: "tasks/task_controls",
-      locals: { task: @task, project: @task.project, doc_content: TaskDocument.read(@task) }
+      target: "task-toolbar",
+      partial: "tasks/task_toolbar",
+      locals: { task: @task, project: @task.project }
     )
   end
 

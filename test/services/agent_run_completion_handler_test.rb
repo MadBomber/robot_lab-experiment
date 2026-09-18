@@ -22,7 +22,7 @@ class AgentRunCompletionHandlerTest < ActiveSupport::TestCase
     assert_equal 0, task.agent_runs.where.not(id: run.id).count
   end
 
-  test "planning stopping broadcasts a refresh of both the header and the sidebar" do
+  test "planning stopping broadcasts a refresh of both the header and the toolbar" do
     task = build_task(planning_complete: true)
     run = finished_run(task, "planning")
     targets = []
@@ -32,7 +32,7 @@ class AgentRunCompletionHandlerTest < ActiveSupport::TestCase
     end
 
     assert_includes targets, "task-header"
-    assert_includes targets, "task-sidebar"
+    assert_includes targets, "task-toolbar"
   end
 
   test "milestone actions broadcast a toast into the layout's toaster region" do

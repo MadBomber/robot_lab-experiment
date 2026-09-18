@@ -1,0 +1,31 @@
+<%# The sidebar's default navigation: every repository the pipeline can run
+    against, each carrying an ACTIVE/IDLE word (never a bare dot). %>
+<section aria-labelledby="sidebar-repos-heading" class="space-y-3">
+  <h2 id="sidebar-repos-heading" class="font-mono text-xs uppercase tracking-widest text-muted-foreground">Repositories</h2>
+  <% if sidebar_projects.any? %>
+    <%= poetry_item_group do %>
+      <% current_project = defined?(@project) && @project&.persisted? ? @project : nil %>
+      <% sidebar_projects.each_with_index do |sidebar_project, index| %>
+        <%= poetry_item_separator(key: sidebar_project) if index.positive? %>
+        <%= poetry_item(size: :sm, role: "listitem", tag: :a, href: project_path(sidebar_project),
+              "aria-current": (sidebar_project == current_project ? "page" : nil)) do |item| %>
+          <% item.with_title do %>
+            <span class="<%= "font-semibold" if sidebar_project == current_project %>"><%= sidebar_project.name %></span>
+          <% end %>
+          <% item.with_actions do %>
+            <% if active_project_ids.include?(sidebar_project.id) %>
+              <%= poetry_badge(variant: :warning) do %>
+                <%= poetry_spinner(label: "Agent running", class: "size-3") %>
+                ACTIVE
+              <% end %>
+            <% else %>
+              <%= poetry_badge(variant: :outline) { "IDLE" } %>
+            <% end %>
+          <% end %>
+        <% end %>
+      <% end %>
+    <% end %>
+  <% else %>
+    <p class="text-sm text-muted-foreground">No projects yet.</p>
+  <% end %>
+</section>

@@ -1,0 +1,38 @@
+<%# The one sidebar, always on the LEFT (see .impeccable.md hard rules):
+    the fleet-wide "Needs you" attention queue on top -- identical on every
+    page so the things waiting on a human always live in the same place --
+    then a per-page navigation section (content_for :sidebar_nav, or the
+    repositories list by default), with the default model pinned at the
+    bottom. Composed from poetry parts inside a plain flex frame; the
+    poetry_sidebar shell is deliberately not used because its fixed,
+    collapsible column can't sit under the constant header/footer frame. %>
+<aside class="hidden w-72 shrink-0 border-r border-border bg-card lg:flex lg:flex-col" aria-label="Fleet status and navigation">
+  <div class="flex flex-1 flex-col gap-6 overflow-y-auto px-4 py-5">
+    <% if attention_tasks.any? %>
+      <section aria-labelledby="needs-you-heading" class="space-y-3">
+        <h2 id="needs-you-heading" class="font-mono text-xs uppercase tracking-widest text-destructive">
+          Needs you — <%= attention_tasks.size %>
+        </h2>
+        <%= poetry_item_group(class: "space-y-2") do %>
+          <% attention_tasks.each do |task| %>
+            <%= poetry_item(variant: :outline, size: :sm, role: "listitem",
+                  tag: :a, href: project_task_path(task.project, task)) do |item| %>
+              <% item.with_header do %>
+                <%= poetry_badge(variant: task_status_variant(task)) { task_status_word(task) } %>
+              <% end %>
+              <% item.with_title { task.title } %>
+              <% item.with_description { task_status_detail(task) } %>
+            <% end %>
+          <% end %>
+        <% end %>
+      </section>
+    <% end %>
+
+    <%= content_for?(:sidebar_nav) ? content_for(:sidebar_nav) : render("shared/sidebar_projects") %>
+  </div>
+
+  <div class="border-t border-border px-5 py-4">
+    <div class="font-mono text-xs uppercase tracking-widest text-muted-foreground">Default model</div>
+    <div class="mt-1 font-mono text-xs text-muted-foreground"><%= AgentRunner::DEFAULT_PROVIDER %> / <%= AgentRunner::DEFAULT_MODEL %></div>
+  </div>
+</aside>

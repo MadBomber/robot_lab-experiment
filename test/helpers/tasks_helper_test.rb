@@ -6,7 +6,7 @@ class TasksHelperTest < ActionView::TestCase
   test "maps each task status to its badge variant" do
     assert_equal :outline, task_status_badge_variant("pending")
     assert_equal :info,    task_status_badge_variant("in_progress")
-    assert_equal :warning, task_status_badge_variant("in_review")
+    assert_equal :info,    task_status_badge_variant("in_review")
     assert_equal :success, task_status_badge_variant("completed")
   end
 

@@ -35,7 +35,14 @@ class Task < ApplicationRecord
   end
 
   def running_agent_run
-    agent_runs.find_by(status: "running")
+    # Use the loaded association when a list view preloaded it (the task
+    # tables and the sidebar queue render many tasks) instead of a query per
+    # task; the find_by path stays for single-task callers.
+    if agent_runs.loaded?
+      agent_runs.detect { |run| run.status == "running" }
+    else
+      agent_runs.find_by(status: "running")
+    end
   end
 
   def iteration_cap_reached?

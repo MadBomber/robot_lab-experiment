@@ -1,44 +1,76 @@
-<div class="mx-auto w-full max-w-3xl">
+<div class="mx-auto w-full max-w-5xl">
   <%= render layout: "shared/page_header",
         locals: { title: @project.name, description: @project.effective_cwd,
                   description_class: "font-mono",
                   crumbs: [["Projects", projects_path], [@project.name, nil]] } do %>
-    <%= poetry_button(variant: :outline, href: edit_project_path(@project)) { "Edit" } %>
-    <%= form_with url: project_audit_tasks_path(@project), method: :post, class: "inline" do %>
-      <%= poetry_button(variant: :secondary, type: :submit) { "Run self-audit" } %>
-    <% end %>
-    <% if @tasks.any?(&:completed?) %>
-      <%= form_with url: clear_completed_project_tasks_path(@project), method: :delete, class: "inline",
-            data: { turbo_confirm: "This will permanently delete all completed tasks, their worktrees, and archived docs.\n\nAre you sure?" } do %>
-        <%= poetry_button(variant: :outline, type: :submit) { "Clear completed tasks" } %>
-      <% end %>
-    <% end %>
-    <%= form_with url: project_path(@project), method: :delete, class: "inline",
-          data: { turbo_confirm: "This will delete all tasks, worktrees, and archived docs for #{@project.name}.\n\nAre you sure?" } do %>
-      <%= poetry_button(variant: :destructive, type: :submit) { "Delete project" } %>
-    <% end %>
     <%= poetry_button(href: new_project_task_path(@project)) do |button| %>
       <% button.with_leading { poetry_icon(name: :plus) } %>
       New task
     <% end %>
+    <%= form_with url: project_audit_tasks_path(@project), method: :post, class: "inline" do %>
+      <%= poetry_button(variant: :outline, type: :submit) { "Run self-audit" } %>
+    <% end %>
+    <%# Destructive actions live behind the menu, never in the open header
+        row (see .impeccable.md hard rules); submit: items render as real
+        CSRF-carrying forms with a Turbo confirm. %>
+    <%= poetry_dropdown_menu(align: :end) do |menu| %>
+      <% menu.with_trigger(variant: :outline, label: "More actions") { poetry_icon(name: :ellipsis) } %>
+      <% menu.with_item(href: edit_project_path(@project)) { "Edit project" } %>
+      <% if @tasks.any?(&:completed?) %>
+        <% menu.with_item(submit: clear_completed_project_tasks_path(@project), method: :delete,
+             data: { turbo_confirm: "This will permanently delete all completed tasks, their worktrees, and archived docs.\n\nAre you sure?" }) { "Clear completed tasks" } %>
+      <% end %>
+      <% menu.with_separator %>
+      <% menu.with_item(submit: project_path(@project), method: :delete, variant: :destructive,
+           data: { turbo_confirm: "This will delete all tasks, worktrees, and archived docs for #{@project.name}.\n\nAre you sure?" }) { "Delete project" } %>
+    <% end %>
   <% end %>
 
-  <section class="mt-6">
-    <h2 class="mb-2 text-sm font-medium text-muted-foreground">Tasks</h2>
+  <section class="mt-6" aria-labelledby="tasks-heading">
+    <h2 id="tasks-heading" class="mb-2 font-mono text-xs uppercase tracking-widest text-muted-foreground">Tasks</h2>
     <% if @tasks.any? %>
-      <%= poetry_item_group do %>
-        <% @tasks.each_with_index do |task, index| %>
-          <%= poetry_item_separator(key: task) if index.positive? %>
-          <%= poetry_item(size: :sm, role: "listitem") do |item| %>
-            <% item.with_title do %>
-              <%= poetry_link(href: project_task_path(@project, task)) { task.title } %>
+      <div class="overflow-hidden rounded-lg border">
+        <%= poetry_table do %>
+          <%= poetry_table_caption(class: "sr-only") { "Tasks with status, pipeline stage, run count, and last update." } %>
+          <%= poetry_table_header do %>
+            <%= poetry_table_row do %>
+              <%= poetry_table_head { "Status" } %>
+              <%= poetry_table_head { "Task" } %>
+              <%= poetry_table_head { "Pipeline" } %>
+              <%= poetry_table_head(class: "text-right") { "Runs" } %>
+              <%= poetry_table_head(class: "text-right") { "Updated" } %>
             <% end %>
-            <% item.with_actions do %>
-              <%= poetry_badge(variant: task_status_badge_variant(task.status)) { task.status.humanize } %>
+          <% end %>
+          <%= poetry_table_body do %>
+            <% tasks_by_attention(@tasks).each do |task| %>
+              <%= poetry_table_row(key: task) do %>
+                <%= poetry_table_cell(key: [task, :status]) { poetry_badge(variant: task_status_variant(task)) { task_status_word(task) } } %>
+                <%= poetry_table_cell(key: [task, :title]) do %>
+                  <div class="min-w-0">
+                    <%= poetry_link(href: project_task_path(@project, task), class: "font-medium") { task.title } %>
+                    <div class="mt-0.5 text-xs text-muted-foreground"><%= task_status_detail(task) %></div>
+                  </div>
+                <% end %>
+                <%= poetry_table_cell(key: [task, :pipeline]) do %>
+                  <% if task.fix? %>
+                    <span class="whitespace-nowrap font-mono text-xs">
+                      <% task_pipeline_summary(task).each_with_index do |(abbrev, glyph, classes), index| %>
+                        <span class="text-muted-foreground"><%= " · " if index.positive? %></span><span class="<%= classes %>"><%= abbrev %><%= " #{glyph}" if glyph %></span>
+                      <% end %>
+                    </span>
+                  <% else %>
+                    <span class="font-mono text-xs text-muted-foreground">AUDIT</span>
+                  <% end %>
+                <% end %>
+                <%= poetry_table_cell(key: [task, :runs], class: "text-right font-mono text-xs tabular-nums") { "#{task.workflow_run_count}/#{Task::MAX_WORKFLOW_RUNS}" } %>
+                <%= poetry_table_cell(key: [task, :updated], class: "text-right font-mono text-xs tabular-nums text-muted-foreground") do %>
+                  <%= task.running_agent_run ? "now" : "#{time_ago_in_words(task.updated_at)} ago" %>
+                <% end %>
+              <% end %>
             <% end %>
           <% end %>
         <% end %>
-      <% end %>
+      </div>
     <% else %>
       <%= poetry_empty(media_variant: :icon) do |empty| %>
         <% empty.with_media { poetry_icon(name: :"list-todo") } %>
@@ -49,8 +81,8 @@
     <% end %>
   </section>
 
-  <section class="mt-8">
-    <h2 class="mb-2 text-sm font-medium text-muted-foreground">Open GitHub Issues</h2>
+  <section class="mt-8" aria-labelledby="issues-heading">
+    <h2 id="issues-heading" class="mb-2 font-mono text-xs uppercase tracking-widest text-muted-foreground">Open GitHub Issues</h2>
     <% if @open_issues.present? %>
       <%= poetry_item_group do %>
         <% @open_issues.each_with_index do |issue, index| %>
@@ -58,11 +90,12 @@
           <% issue_task = @task_by_issue_number[issue.number] %>
           <%= poetry_item(size: :sm, role: "listitem") do |item| %>
             <% item.with_title do %>
-              <%= poetry_link(href: issue.url, external: true) { "##{issue.number} #{issue.title}" } %>
+              <span class="font-mono text-xs text-muted-foreground">#<%= issue.number %></span>
+              <%= poetry_link(href: issue.url, external: true) { issue.title } %>
             <% end %>
             <% item.with_actions do %>
               <% if issue_task %>
-                <%= poetry_badge(variant: task_status_badge_variant(issue_task.status)) { issue_task.status.humanize } %>
+                <%= poetry_badge(variant: task_status_variant(issue_task)) { task_status_word(issue_task) } %>
                 <%= poetry_button(variant: :outline, size: :sm,
                       href: project_task_path(@project, issue_task)) { "View task" } %>
               <% else %>
