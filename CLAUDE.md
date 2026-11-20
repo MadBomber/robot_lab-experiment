@@ -81,7 +81,7 @@ Stage-specific tools:
 
 ### MCP servers (review agent only)
 
-Review is the verification stage, so it's the only agent that gets MCP tools. `McpConfigNormalizer` reads a Claude Desktop/Cursor-style config from `config/mcp_servers.json` (override with `MCP_CONFIG_PATH`; ERB interpolation for secrets), normalizes it to the spec array `RobotLab.build(mcp_servers:)` expects, and returns `[]` when the file is absent. RobotLab owns the client lifecycle; `AgentRunJob#teardown` disconnects when the turn ends. A malformed config logs a warning and the review agent runs without MCP tools.
+Review is the verification stage, so it's the only agent that gets MCP tools. `McpConfigNormalizer` reads a Claude Desktop/Cursor-style config from `config/mcp_servers.json` (override with `MCP_CONFIG_PATH`; ERB interpolation for secrets), normalizes it to the spec array `RobotLab.build(mcp:)` expects, and returns `[]` when the file is absent. Only stdio and Streamable HTTP servers are supported (robot_lab runs MCP on ruby_llm's built-in client); `sse`/`ws` entries are a config error. RobotLab owns the server lifecycle — the run selects the build-time servers with `mcp: :inherit` — and `AgentRunJob#teardown` disconnects when the turn ends. A malformed config logs a warning and the review agent runs without MCP tools.
 
 ## Services beyond the state machine
 

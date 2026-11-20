@@ -4,18 +4,19 @@ class AgentRunJobTest < ActiveSupport::TestCase
   FakeChunk = Struct.new(:content, :thinking)
 
   class FakeRobot
-    attr_reader :on_content, :on_tool_call, :on_tool_result, :local_tools, :mcp_servers, :ran_message
+    attr_reader :on_content, :on_tool_call, :on_tool_result, :local_tools, :mcp, :ran_message, :run_options
 
-    def initialize(on_content:, on_tool_call:, on_tool_result:, local_tools:, mcp_servers: [], **)
+    def initialize(on_content:, on_tool_call:, on_tool_result:, local_tools:, mcp: [], **)
       @on_content = on_content
       @on_tool_call = on_tool_call
       @on_tool_result = on_tool_result
       @local_tools = local_tools
-      @mcp_servers = mcp_servers
+      @mcp = mcp
     end
 
-    def run(message, **)
+    def run(message, **options)
       @ran_message = message
+      @run_options = options
       @on_tool_call.call(RubyLLM::ToolCall.new(id: "t1", name: "read_file", arguments: { path: "a.txt" }))
       @on_tool_result.call("contents of a.txt")
       @on_content.call(FakeChunk.new("Here is my answer.", nil))
@@ -201,9 +202,9 @@ class AgentRunJobTest < ActiveSupport::TestCase
   end
 
   # ---- MCP servers handed to RobotLab (which owns the client lifecycle) ----
-  # These stub at the RobotLab.build boundary and assert the mcp_servers: kwarg,
+  # These stub at the RobotLab.build boundary and assert the mcp: kwarg,
   # rather than stubbing RubyLLM::MCP -- so they exercise the real integration
-  # point (RobotLab connects/injects/disconnects the MCP clients itself).
+  # point (RobotLab registers/connects/disconnects the MCP servers itself).
 
   def review_run
     start_run("review")
@@ -222,12 +223,12 @@ class AgentRunJobTest < ActiveSupport::TestCase
   end
 
   # Runs the job with McpConfigNormalizer.call stubbed and RobotLab.build stubbed,
-  # returning the mcp_servers: kwarg that reached RobotLab.build.
+  # returning the mcp: kwarg that reached RobotLab.build.
   def captured_mcp_servers(run_id, normalizer:)
     captured = :unset
     McpConfigNormalizer.stub(:call, normalizer) do
       RobotLab.stub(:build, lambda { |**kwargs|
-        captured = kwargs[:mcp_servers]
+        captured = kwargs[:mcp]
         FakeRobot.new(**kwargs)
       }) do
         AgentRunJob.perform_now(run_id)
@@ -236,11 +237,20 @@ class AgentRunJobTest < ActiveSupport::TestCase
     captured
   end
 
-  test "review agent passes the normalized mcp_servers array to RobotLab.build" do
+  test "review agent passes the normalized MCP server array to RobotLab.build as mcp:" do
     run = review_run
     specs = [{ name: "playwright", transport: { type: "stdio", command: "npx", args: ["-y", "@playwright/mcp@latest"] } }]
 
     assert_equal specs, captured_mcp_servers(run.id, normalizer: ->(*) { specs })
+  end
+
+  test "the run inherits the build-time tools and MCP servers instead of Robot#run's :none defaults" do
+    robot = nil
+    RobotLab.stub(:build, ->(**kwargs) { robot = FakeRobot.new(**kwargs) }) do
+      AgentRunJob.perform_now(@agent_run.id)
+    end
+
+    assert_equal({ tools: :inherit, mcp: :inherit }, robot.run_options)
   end
 
   test "review agent passes [] when there is no MCP config" do
@@ -256,7 +266,7 @@ class AgentRunJobTest < ActiveSupport::TestCase
     assert run.reload.completed?, "an invalid MCP config must not fail the run"
   end
 
-  test "non-review agents get [] mcp_servers and never read the MCP config" do
+  test "non-review agents get [] mcp and never read the MCP config" do
     # @agent_run is an implementation run; the normalizer must not be invoked.
     captured = captured_mcp_servers(@agent_run.id, normalizer: ->(*) { raise "should not be called for a non-review agent" })
 

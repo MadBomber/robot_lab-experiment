@@ -13,8 +13,8 @@ class BashTool < CodingTool
               "to the working directory but can access the host filesystem, network, and secrets through " \
               "the OS. Consequently, the 'none' read level does not materially expand what a determined " \
               "caller can already reach via BashTool."
-  param :command, type: "string", desc: "The shell command to run."
-  param :timeout, type: "integer", desc: "Max seconds to allow (default #{DEFAULT_TIMEOUT}).", required: false
+  parameter :command, type: "string", description: "The shell command to run."
+  parameter :timeout, type: "integer", description: "Max seconds to allow (default #{DEFAULT_TIMEOUT}).", required: false
 
   def execute(command:, timeout: DEFAULT_TIMEOUT)
     output = +""

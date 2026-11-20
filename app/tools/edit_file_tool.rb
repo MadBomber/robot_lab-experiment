@@ -1,9 +1,9 @@
 class EditFileTool < CodingTool
   description "Replace an exact string in a file with another string. By default old_string must occur exactly once."
-  param :path, type: "string", desc: "Path to the file, relative to the working directory."
-  param :old_string, type: "string", desc: "The exact text to find and replace."
-  param :new_string, type: "string", desc: "The replacement text."
-  param :replace_all, type: "boolean", desc: "Replace every occurrence instead of requiring exactly one.", required: false
+  parameter :path, type: "string", description: "Path to the file, relative to the working directory."
+  parameter :old_string, type: "string", description: "The exact text to find and replace."
+  parameter :new_string, type: "string", description: "The replacement text."
+  parameter :replace_all, type: "boolean", description: "Replace every occurrence instead of requiring exactly one.", required: false
 
   # replace_all defaults to nil (an omitted optional param); nil and false
   # behave identically here.

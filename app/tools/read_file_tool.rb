@@ -1,6 +1,6 @@
 class ReadFileTool < CodingTool
   description "Read the contents of a file within the current working directory."
-  param :path, type: "string", desc: "Path to the file, relative to the working directory."
+  parameter :path, type: "string", description: "Path to the file, relative to the working directory."
 
   def execute(path:)
     full = resolve_read_path(path)

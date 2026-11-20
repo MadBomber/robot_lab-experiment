@@ -1,7 +1,7 @@
 class GlobTool < CodingTool
   description "Find files matching a glob pattern (e.g. '**/*.rb') within the working directory."
-  param :pattern, type: "string", desc: "Glob pattern, relative to the working directory (or to path if given)."
-  param :path, type: "string", desc: "Subdirectory to search within, relative to the working directory.", required: false
+  parameter :pattern, type: "string", description: "Glob pattern, relative to the working directory (or to path if given)."
+  parameter :path, type: "string", description: "Subdirectory to search within, relative to the working directory.", required: false
 
   def execute(pattern:, path: ".")
     base = resolve_read_path(path)

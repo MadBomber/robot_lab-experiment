@@ -10,8 +10,8 @@ class CreateGithubIssueTool < CodingTool
   MAX_ISSUES_PER_RUN = 10
 
   description "File a new GitHub issue for a concrete, verified problem found in this repository."
-  param :title, type: "string", desc: "A short, specific issue title."
-  param :body, type: "string", desc: "The issue body: what's wrong, where (file/line), and how to fix it."
+  parameter :title, type: "string", description: "A short, specific issue title."
+  parameter :body, type: "string", description: "The issue body: what's wrong, where (file/line), and how to fix it."
 
   def initialize(cwd:, robot: nil)
     super

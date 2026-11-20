@@ -2,6 +2,17 @@
 
 All notable changes to this project are documented here.
 
+## [Unreleased]
+
+### Changed
+
+- **Moved to robot_lab 0.6 / ruby_llm 2.x** (from robot_lab 0.2.8 / ruby_llm 1.16). The `Gemfile` now requires `robot_lab ~> 0.6`.
+  - Tools use the ruby_llm 2 DSL: `param ... desc:` became `parameter ... description:`.
+  - MCP servers are handed to `RobotLab.build` as `mcp:` (was `mcp_servers:`), and the run passes `mcp: :inherit` so the review agent's servers are actually selected.
+  - `McpConfigNormalizer` rejects `sse`/`ws`/`websocket` servers with a pointer to Streamable HTTP (robot_lab's MCP layer is now ruby_llm's built-in client: stdio and Streamable HTTP only) and vets every spec with `RobotLab::MCP.define`, so a spec robot_lab would refuse degrades the review stage instead of failing the run.
+  - `Dockerfile` `RUBY_VERSION` raised to 4.0.9 to match `.ruby-version`.
+- **Development Ruby pinned to 4.0.9.** `.ruby-version` bumped from 4.0.6 to 4.0.9 to match the new floor of the robot_lab gems.
+
 ## 2026-08-28
 
 ### Added

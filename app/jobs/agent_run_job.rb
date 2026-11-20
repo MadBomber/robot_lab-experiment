@@ -34,10 +34,11 @@ class AgentRunJob < ApplicationJob
 
   def run_turn
     recorder.start
-    # Robot#run has its own `tools: :none` default, independent of local_tools
-    # passed to RobotLab.build -- without this, the chat's tool list gets
-    # wiped to empty on every turn and the LLM never sees any of our tools.
-    build_robot.run(kickoff_message, tools: :inherit)
+    # Robot#run has its own `tools: :none` / `mcp: :none` defaults, independent
+    # of what was passed to RobotLab.build -- without these, the chat's tool
+    # list gets wiped to empty on every turn and the LLM never sees any of our
+    # tools, and the build-time MCP servers are never selected for the run.
+    build_robot.run(kickoff_message, tools: :inherit, mcp: :inherit)
     agent_run.update!(status: "completed")
   rescue Cancelled
     cancelled
@@ -49,8 +50,8 @@ class AgentRunJob < ApplicationJob
     teardown
   end
 
-  # RobotLab connects the MCP clients when the robot is built; tear down their
-  # stdio subprocesses when the turn ends. `try`: build_robot may not have
+  # RobotLab connects the MCP servers on the first run that selects them; tear
+  # down their stdio subprocesses when the turn ends. `try`: build_robot may not have
   # assigned @robot (or returned a robot without MCP) when the turn unwound.
   def teardown
     robot.try(:disconnect)
@@ -114,7 +115,7 @@ class AgentRunJob < ApplicationJob
       provider: conversation.provider,
       model: conversation.model,
       local_tools: tools_for,
-      mcp_servers: mcp_servers, # RobotLab connects them + injects their tools
+      mcp: mcp_servers, # RobotLab registers them; the run attaches their tools
       max_tool_rounds: PlateauMonitor::MAX_TOOL_CALLS, # robot_lab's coarse circuit-breaker backstop
       on_content: ->(chunk) { recorder.record_content(chunk) },
       on_tool_call: lambda { |tool_call|
@@ -186,7 +187,7 @@ class AgentRunJob < ApplicationJob
 
   # MCP servers for this run. Review is the verification stage, so it's the one
   # that gets browser/MCP access; other stages get none. RobotLab owns the
-  # connection lifecycle (Robot::MCPManagement) -- we just hand it the spec array.
+  # connection lifecycle (its per-robot MCP::Registry) -- we just hand it the spec array.
   def mcp_servers
     return [] unless agent_run.agent_type == "review"
 

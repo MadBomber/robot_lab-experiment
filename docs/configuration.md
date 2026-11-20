@@ -42,7 +42,7 @@ Have Ollama running with the target model already pulled first — there's no fa
 
 ## MCP Servers
 
-`McpConfigNormalizer` reads a Claude-Desktop/Cursor/`~/.mcp.json`-style config file (JSON or YAML, with ERB interpolation available for secrets) and normalizes it into the array of server specs `RobotLab.build(mcp_servers:)` expects:
+`McpConfigNormalizer` reads a Claude-Desktop/Cursor/`~/.mcp.json`-style config file (JSON or YAML, with ERB interpolation available for secrets) and normalizes it into the array of server specs `RobotLab.build(mcp:)` expects:
 
 ```json
 {
@@ -61,9 +61,9 @@ normalizes to:
 [{ name: "playwright", transport: { type: "stdio", command: "npx", args: ["-y", "@playwright/mcp@latest"] } }]
 ```
 
-Transport type is taken from an explicit `"type"` key when present (`stdio`/`sse`/`http`/`streamable-http`/`ws`, with a few synonym spellings normalized), or inferred otherwise: a `command` implies `stdio`, a bare `url` implies `streamable-http`. `RobotLab` itself owns the actual MCP client lifecycle (connect, tool injection, disconnect via `Robot::MCPManagement`) — this class only translates the portable config file format into the spec array `RobotLab.build` consumes.
+Transport type is taken from an explicit `"type"` key when present (`stdio`/`http`/`streamable-http`, with a few synonym spellings normalized; the legacy `sse`/`ws` types are rejected, since robot_lab's MCP layer — ruby_llm's built-in client — speaks only stdio and Streamable HTTP), or inferred otherwise: a `command` implies `stdio`, a bare `url` implies `streamable-http`. `RobotLab` itself owns the actual MCP server lifecycle (register, connect on first use, attach tools per run, disconnect) — this class only translates the portable config file format into the spec array `RobotLab.build` consumes.
 
-No `config/mcp_servers.json` ships in this repo by default — `McpConfigNormalizer.call` returns `[]` when the file is absent, and `AgentRunJob#mcp_servers_for` catches `McpConfigNormalizer::Error` on a malformed file, logging a warning and falling back to `[]` (an MCP config mistake degrades the review stage to no MCP tools, rather than crashing the run). Only the `review` stage is ever given MCP servers at all — see [Tools Reference](tools_reference.md#which-stage-gets-which-tools).
+No `config/mcp_servers.json` ships in this repo by default — `McpConfigNormalizer.call` returns `[]` when the file is absent, and `AgentRunJob#mcp_servers` catches `McpConfigNormalizer::Error` on a malformed file, logging a warning and falling back to `[]` (an MCP config mistake degrades the review stage to no MCP tools, rather than crashing the run). Only the `review` stage is ever given MCP servers at all — see [Tools Reference](tools_reference.md#which-stage-gets-which-tools).
 
 ## Background Jobs
 

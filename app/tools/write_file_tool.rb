@@ -1,7 +1,7 @@
 class WriteFileTool < CodingTool
   description "Write content to a file within the current working directory, creating it (and any parent directories) if needed."
-  param :path, type: "string", desc: "Path to the file, relative to the working directory."
-  param :content, type: "string", desc: "The full content to write."
+  parameter :path, type: "string", description: "Path to the file, relative to the working directory."
+  parameter :content, type: "string", description: "The full content to write."
 
   def execute(path:, content:)
     full = resolve_write_path(path)

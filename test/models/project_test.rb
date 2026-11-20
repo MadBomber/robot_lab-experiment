@@ -104,7 +104,7 @@ class ProjectTest < ActiveSupport::TestCase
   end
 
   test "llm_options includes ollama models found by a live query against the local server" do
-    fake_model = RubyLLM::Model::Info.new(id: "qwen3.6:latest", name: "qwen3.6:latest", provider: "ollama")
+    fake_model = RubyLLM::Model.new(id: "qwen3.6:latest", name: "qwen3.6:latest", provider: "ollama")
     fake_provider = Minitest::Mock.new
     fake_provider.expect(:list_models, [fake_model])
 

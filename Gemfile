@@ -34,8 +34,13 @@ gem "tzinfo-data", platforms: %i[windows jruby]
 # Gemfile.local re-declares these as path: gems for cross-gem development,
 # so skip them here when bundling under that gemfile.
 unless File.basename(ENV.fetch("BUNDLE_GEMFILE", "Gemfile")) == "Gemfile.local"
-  gem "robot_lab"
-  gem "robot_lab-rails"
+  # The app uses the 0.6 API (mcp:, RobotLab::MCP.define, ruby_llm 2.x tool DSL).
+  # Without this floor Bundler quietly settles on an older robot_lab whenever
+  # the published robot_lab-rails still pins one. robot_lab-rails 0.3.0 is the
+  # last release pinned to robot_lab 0.3 (and 0.1.0 has no pin at all), so
+  # require something newer (0.6.1 is the first with `robot_lab ~> 0.6`).
+  gem "robot_lab", "~> 0.6"
+  gem "robot_lab-rails", "> 0.3.0"
 end
 
 # json 3.x makes JSON.parse options keyword-only; activesupport 8.1.3.1 still

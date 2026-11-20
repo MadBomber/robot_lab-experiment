@@ -4,24 +4,27 @@ require "yaml"
 
 # Reads a Claude Desktop / Cursor / ~/.mcp.json style MCP config file (JSON or
 # YAML, with ERB interpolation for secrets) and normalizes it to the array of
-# server specs RobotLab.build(mcp_servers:) expects -- the RobotLab::MCP::Server
-# shape:
+# server specs RobotLab.build(mcp:) expects -- the config Hash shape
+# RobotLab::MCP.build turns into a RubyLLM::MCP server:
 #
 #   [{ name: "playwright",
 #      transport: { type: "stdio", command: "npx", args: ["-y", "@playwright/mcp@latest"] } }]
 #
-# RobotLab owns the client lifecycle (connect, tool injection, disconnect via
-# Robot::MCPManagement); this only translates the portable config format into
-# its spec array.
+# RobotLab owns the server lifecycle (register, connect on first use, attach
+# tools per run, disconnect); this only translates the portable config format
+# into its spec array.
 #
 # Path: defaults to config/mcp_servers.json, overridable with MCP_CONFIG_PATH
 # (tilde-expanded, so MCP_CONFIG_PATH=~/.mcp.json reuses an existing home file).
 #
-# Transport: honors an explicit "type" (stdio/sse/http/streamable-http/ws), else
-# infers from command (stdio) vs url (streamable-http).
+# Transport: honors an explicit "type" (stdio/http/streamable-http), else
+# infers from command (stdio) vs url (streamable-http). robot_lab runs MCP on
+# ruby_llm's built-in client, which speaks only stdio and Streamable HTTP, so
+# the legacy sse/ws types are rejected here with guidance.
 #
 # Returns [] when the file is absent. Raises McpConfigNormalizer::Error on a
-# malformed file (array instead of object, missing command/url, unknown type)
+# malformed file (array instead of object, missing command/url, unknown or
+# unsupported type, or anything else RobotLab::MCP.define refuses)
 # so misconfiguration fails loudly rather than silently loading no tools.
 class McpConfigNormalizer
   class Error < StandardError; end
@@ -62,7 +65,17 @@ class McpConfigNormalizer
   def normalize(name, spec)
     raise Error, "server '#{name}' must be an object, got #{spec.class}" unless spec.is_a?(Hash)
 
-    { name: name.to_s, transport: transport_for(name, spec) }
+    validated({ name: name.to_s, transport: transport_for(name, spec) })
+  end
+
+  # Let robot_lab itself vet the spec (it builds the server class without
+  # connecting), so anything it would refuse at RobotLab.build -- which would
+  # fail the whole run -- surfaces here as a config error instead.
+  def validated(server)
+    RobotLab::MCP.define(server)
+    server
+  rescue RobotLab::MCPError, ArgumentError => e
+    raise Error, "server '#{server[:name]}': #{e.message}"
   end
 
   def transport_for(name, spec)
@@ -73,14 +86,10 @@ class McpConfigNormalizer
       raise Error, "server '#{name}': stdio transport requires a command" if command.blank?
 
       { type: "stdio", command:, args: Array(args), env: }.compact
-    when "sse", "streamable-http"
+    when "streamable-http"
       raise Error, "server '#{name}': #{transport} transport requires a url" if url.blank?
 
       { type: transport, url:, headers: }.compact
-    when "ws"
-      raise Error, "server '#{name}': ws transport requires a url" if url.blank?
-
-      { type: "ws", url: }
     end
   end
 
@@ -97,9 +106,10 @@ class McpConfigNormalizer
   def normalize_type(name, type)
     case type
     when "stdio" then "stdio"
-    when "sse" then "sse"
     when "http", "streamable-http", "streamable", "streamable_http" then "streamable-http"
-    when "ws", "websocket" then "ws"
+    when "sse", "ws", "websocket"
+      raise Error, "server '#{name}': the '#{type}' transport is no longer supported -- " \
+                   "point it at the server's Streamable HTTP endpoint (type \"http\") instead"
     else raise Error, "server '#{name}': unsupported transport type '#{type}'"
     end
   end

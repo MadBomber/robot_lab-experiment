@@ -55,9 +55,34 @@ class McpConfigNormalizerTest < ActiveSupport::TestCase
     )
   end
 
-  test "explicit sse type is honored (not collapsed to http)" do
-    path = write("mcp_servers.json", '{"mcpServers":{"sentry":{"type":"sse","url":"https://mcp.sentry.dev/sse"}}}')
-    assert_equal "sse", McpConfigNormalizer.call(path).first.dig(:transport, :type)
+  test "sse and websocket types are rejected with a pointer to Streamable HTTP" do
+    %w[sse ws websocket].each do |type|
+      path = write("mcp_servers.json", %({"mcpServers":{"sentry":{"type":"#{type}","url":"https://mcp.sentry.dev/x"}}}))
+      error = assert_raises(McpConfigNormalizer::Error) { McpConfigNormalizer.call(path) }
+      assert_match "no longer supported", error.message
+      assert_match "Streamable HTTP", error.message
+    end
+  end
+
+  test "every normalized spec is one RobotLab::MCP can build a server from" do
+    path = write("mcp_servers.json", <<~JSON)
+      { "mcpServers": {
+        "playwright": { "command": "npx", "args": ["x"], "env": { "TOKEN": "t" } },
+        "remote":     { "url": "https://s/mcp", "headers": { "X-Key": "k" } }
+      } }
+    JSON
+
+    servers = McpConfigNormalizer.call(path).map { |spec| RobotLab::MCP.build(spec) }
+    assert_equal %w[playwright remote], servers.map(&:name)
+    assert(servers.all?(RubyLLM::MCP))
+  end
+
+  test "a spec robot_lab itself refuses is reported as a config error" do
+    path = write("mcp_servers.json", '{"mcpServers":{"api":{"url":"https://x/mcp"}}}')
+    RobotLab::MCP.stub(:define, ->(*) { raise RobotLab::MCPError, "nope" }) do
+      error = assert_raises(McpConfigNormalizer::Error) { McpConfigNormalizer.call(path) }
+      assert_match "server 'api': nope", error.message
+    end
   end
 
   test "explicit http type maps to streamable-http" do
@@ -71,14 +96,14 @@ class McpConfigNormalizerTest < ActiveSupport::TestCase
     path = write("mcp_servers.json", <<~JSON)
       { "mcpServers": {
         "playwright": { "command": "npx", "args": ["x"] },
-        "remote":     { "type": "sse", "url": "https://s/sse" }
+        "remote":     { "type": "http", "url": "https://s/mcp" }
       } }
     JSON
 
     result = McpConfigNormalizer.call(path)
     assert_equal 2, result.size
     assert_equal "stdio", result.find { |s| s[:name] == "playwright" }.dig(:transport, :type)
-    assert_equal "sse", result.find { |s| s[:name] == "remote" }.dig(:transport, :type)
+    assert_equal "streamable-http", result.find { |s| s[:name] == "remote" }.dig(:transport, :type)
   end
 
   # ---- loud failures on malformed config ----
