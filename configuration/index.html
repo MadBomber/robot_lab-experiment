@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.2">
     
     
       
@@ -31,10 +31,10 @@
       
     
     
-      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.57a0d79d.min.css">
       
         
-        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../assets/stylesheets/palette.fb2fffe2.min.css">
       
       
 
@@ -836,7 +836,7 @@
 </tbody>
 </table>
 <h2 id="mcp-servers">MCP Servers<a class="headerlink" href="#mcp-servers" title="Permanent link">&para;</a></h2>
-<p><code>McpConfigNormalizer</code> reads a Claude-Desktop/Cursor/<code>~/.mcp.json</code>-style config file (JSON or YAML, with ERB interpolation available for secrets) and normalizes it into the array of server specs <code>RobotLab.build(mcp_servers:)</code> expects:</p>
+<p><code>McpConfigNormalizer</code> reads a Claude-Desktop/Cursor/<code>~/.mcp.json</code>-style config file (JSON or YAML, with ERB interpolation available for secrets) and normalizes it into the array of server specs <code>RobotLab.build(mcp:)</code> expects:</p>
 <div class="language-json highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="p">{</span>
 </span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span><span class="nt">"mcpServers"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
 </span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">    </span><span class="nt">"playwright"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
@@ -849,8 +849,8 @@
 <p>normalizes to:</p>
 <div class="language-ruby highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="o">[</span><span class="p">{</span><span class="w"> </span><span class="nb">name</span><span class="p">:</span><span class="w"> </span><span class="s2">"playwright"</span><span class="p">,</span><span class="w"> </span><span class="ss">transport</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="ss">type</span><span class="p">:</span><span class="w"> </span><span class="s2">"stdio"</span><span class="p">,</span><span class="w"> </span><span class="ss">command</span><span class="p">:</span><span class="w"> </span><span class="s2">"npx"</span><span class="p">,</span><span class="w"> </span><span class="ss">args</span><span class="p">:</span><span class="w"> </span><span class="o">[</span><span class="s2">"-y"</span><span class="p">,</span><span class="w"> </span><span class="s2">"@playwright/mcp@latest"</span><span class="o">]</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="p">}</span><span class="o">]</span>
 </span></code></pre></div>
-<p>Transport type is taken from an explicit <code>"type"</code> key when present (<code>stdio</code>/<code>sse</code>/<code>http</code>/<code>streamable-http</code>/<code>ws</code>, with a few synonym spellings normalized), or inferred otherwise: a <code>command</code> implies <code>stdio</code>, a bare <code>url</code> implies <code>streamable-http</code>. <code>RobotLab</code> itself owns the actual MCP client lifecycle (connect, tool injection, disconnect via <code>Robot::MCPManagement</code>) — this class only translates the portable config file format into the spec array <code>RobotLab.build</code> consumes.</p>
-<p>No <code>config/mcp_servers.json</code> ships in this repo by default — <code>McpConfigNormalizer.call</code> returns <code>[]</code> when the file is absent, and <code>AgentRunJob#mcp_servers_for</code> catches <code>McpConfigNormalizer::Error</code> on a malformed file, logging a warning and falling back to <code>[]</code> (an MCP config mistake degrades the review stage to no MCP tools, rather than crashing the run). Only the <code>review</code> stage is ever given MCP servers at all — see <a href="../tools_reference/#which-stage-gets-which-tools">Tools Reference</a>.</p>
+<p>Transport type is taken from an explicit <code>"type"</code> key when present (<code>stdio</code>/<code>http</code>/<code>streamable-http</code>, with a few synonym spellings normalized; the legacy <code>sse</code>/<code>ws</code> types are rejected, since robot_lab's MCP layer — ruby_llm's built-in client — speaks only stdio and Streamable HTTP), or inferred otherwise: a <code>command</code> implies <code>stdio</code>, a bare <code>url</code> implies <code>streamable-http</code>. <code>RobotLab</code> itself owns the actual MCP server lifecycle (register, connect on first use, attach tools per run, disconnect) — this class only translates the portable config file format into the spec array <code>RobotLab.build</code> consumes.</p>
+<p>No <code>config/mcp_servers.json</code> ships in this repo by default — <code>McpConfigNormalizer.call</code> returns <code>[]</code> when the file is absent, and <code>AgentRunJob#mcp_servers</code> catches <code>McpConfigNormalizer::Error</code> on a malformed file, logging a warning and falling back to <code>[]</code> (an MCP config mistake degrades the review stage to no MCP tools, rather than crashing the run). Only the <code>review</code> stage is ever given MCP servers at all — see <a href="../tools_reference/#which-stage-gets-which-tools">Tools Reference</a>.</p>
 <h2 id="background-jobs">Background Jobs<a class="headerlink" href="#background-jobs" title="Permanent link">&para;</a></h2>
 <p>Solid Queue (<code>bin/jobs</code> runs the worker process) — no Redis, no Sidekiq. <code>AgentRunJob</code> and <code>AgentRunCompletionJob</code> both <code>queue_as :default</code>.</p>
 <h2 id="orphan-run-recovery">Orphan Run Recovery<a class="headerlink" href="#orphan-run-recovery" title="Permanent link">&para;</a></h2>
@@ -959,10 +959,10 @@
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.tabs.sticky", "navigation.path", "navigation.indexes", "navigation.top", "navigation.footer", "toc.follow", "search.suggest", "search.highlight", "search.share", "header.autohide", "content.code.copy", "content.code.annotate", "content.tabs.link", "content.tooltips", "content.action.edit", "content.action.view"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.tabs.sticky", "navigation.path", "navigation.indexes", "navigation.top", "navigation.footer", "toc.follow", "search.suggest", "search.highlight", "search.share", "header.autohide", "content.code.copy", "content.code.annotate", "content.tabs.link", "content.tooltips", "content.action.edit", "content.action.view"], "search": "../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      <script src="../assets/javascripts/bundle.a5f9d56c.min.js"></script>
       
     
   </body>
