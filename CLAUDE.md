@@ -67,7 +67,7 @@ Each agent type's system prompt lives in `app/prompts/{planning,implementation,r
 
 ## Tools (`app/tools/`)
 
-All agent-facing tools subclass `RobotLab::Tool` through one of two base classes:
+Which tools each stage gets is decided in one place, `AgentToolset` (`app/services/agent_toolset.rb`), for both the RubyLLM path and the Claude Code bridge below. All agent-facing tools subclass `RobotLab::Tool` through one of two base classes:
 
 - **`CodingTool`** (`cwd`-scoped: read/write/edit/glob/grep/bash, plus `QualityGateTool` and the GitHub-issue tools) — path resolution confines every filesystem call. Reads honor a per-agent-type **sandbox level** (`tight`/`loose`/`root`, see `CodingTool.agent_type_override`: review gets `root`, pr `tight`, the rest `loose`; env overrides `AGENT_SANDBOX_LEVEL` and `AGENT_READABLE_ROOT`); writes are always cwd-confined at every level.
 - **`TaskScopedTool`** (`task`-scoped, not `cwd`-scoped) — the task-doc read/write tools and the `mark_*` completion-signal tools (`TaskCompletionTool` subclasses). These flip `Task` boolean flags directly via ActiveRecord since this port runs in-process (unlike the original design's subprocess-CLI approach — see the comment in `task_completion_tool.rb`).
@@ -82,6 +82,17 @@ Stage-specific tools:
 ### MCP servers (review agent only)
 
 Review is the verification stage, so it's the only agent that gets MCP tools. `McpConfigNormalizer` reads a Claude Desktop/Cursor-style config from `config/mcp_servers.json` (override with `MCP_CONFIG_PATH`; ERB interpolation for secrets), normalizes it to the spec array `RobotLab.build(mcp:)` expects, and returns `[]` when the file is absent. Only stdio and Streamable HTTP servers are supported (robot_lab runs MCP on ruby_llm's built-in client); `sse`/`ws` entries are a config error. RobotLab owns the server lifecycle — the run selects the build-time servers with `mcp: :inherit` — and `AgentRunJob#teardown` disconnects when the turn ends. A malformed config logs a warning and the review agent runs without MCP tools.
+
+### Claude Code runs (`claude_code` provider)
+
+A project or run can pick `claude_code` (models `default`/`opus`/`sonnet`/`haiku`). The provider gem runs `claude -p` and refuses RubyLLM tools, so `AgentRunJob` builds that robot with no tools or MCP servers, runs it with `tools: :none, mcp: :none`, and appends `CLAUDE_CODE_NOTE` to the stage prompt. Claude Code then works like this:
+
+- **Its own built-ins for files and the shell.** `--tools` limits them per stage (`AgentToolset::CLAUDE_CODE_BUILTINS`) and `--allowedTools` pre-approves them; batch mode refuses anything else. Only implementation gets Edit/Write, under `acceptEdits`, which approves edits inside the worktree and refuses them outside it. The app's read sandbox levels do **not** apply to these built-ins.
+- **The app's own tools over MCP.** `bin/task_mcp AGENT_RUN_ID` is a stdio server (official `mcp` gem) serving `AgentToolset#bridge_tools` through `McpToolAdapter`: task doc, `mark_*`, `quality_gate`, GitHub issues. Claude Code starts it from the job's `--mcp-config`, and the agent sees the tools as `mcp__task__<name>`. It writes no transcript rows, because a second writer would race the recorder's `seq`. Stdio rather than an HTTP endpoint because the app has no auth.
+- **Oversight through the provider's `on_event` hook.** `ClaudeCodeEventBridge` turns each `tool_use`/`tool_result` into transcript rows and `PlateauMonitor` calls, and checks for Stop/Abandon. A raise there kills the CLI's process group (provider gem ≥ 0.0.2) and unwinds `run_turn` as usual.
+- **Isolated from the user's personal settings.** `--strict-mcp-config` and `--setting-sources project,local` keep the user's own MCP servers, hooks, plugins and global CLAUDE.md out of pipeline stages.
+
+Runs need a logged-in `claude` CLI, and they bill that account.
 
 ## Services beyond the state machine
 
@@ -110,6 +121,6 @@ All views compose the [Poetry UI](https://poetryui.com) component library (`poet
 
 ## Config
 
-Default LLM provider/model live as constants in `AgentRunner` (`openrouter` / `moonshotai/kimi-k2.7-code`), overridable per task (`Task#llm_provider`/`llm_model`) or per run. There's no `config/robot_lab.yml` — robot_lab's config cascade falls through to gem defaults + `RubyLLM.configure` in `config/initializers/ruby_llm.rb`, which sets the Ollama base URL (`ROBOT_LAB_RUBY_LLM__OLLAMA_API_BASE`, default local) and the OpenRouter key (`OPENROUTER_API_KEY` — RubyLLM does not auto-read it from ENV). `config/initializers/orphan_agent_run_recovery.rb` sweeps any `AgentRun` still `running` to `failed` at boot, scoped only to `rails server`/`bin/jobs` processes (never console/runner/rake/tests) — a server restart mid-turn shouldn't leave a task stuck.
+Default LLM provider/model live as constants in `AgentRunner` (`openrouter` / `moonshotai/kimi-k2.7-code`), overridable per task (`Task#llm_provider`/`llm_model`) or per run. There's no `config/robot_lab.yml` — robot_lab's config cascade falls through to gem defaults + `RubyLLM.configure` in `config/initializers/ruby_llm.rb`, which sets optional overrides for the local model servers (`ROBOT_LAB_RUBY_LLM__LMS_API_BASE`, `ROBOT_LAB_RUBY_LLM__APFEL_API_BASE`; the provider gems default to LM Studio on :1234 and apfel on :11434) and the OpenRouter key (`OPENROUTER_API_KEY` — RubyLLM does not auto-read it from ENV). The project LLM picker (`Project.llm_options`) lists LM Studio and apfel models by live query, keeping only chat models that can call tools, then Claude Code's static model aliases, then OpenRouter from RubyLLM's registry. `config/initializers/orphan_agent_run_recovery.rb` sweeps any `AgentRun` still `running` to `failed` at boot, scoped only to `rails server`/`bin/jobs` processes (never console/runner/rake/tests) — a server restart mid-turn shouldn't leave a task stuck.
 
 Background jobs run on Solid Queue (`bin/jobs`); no Redis/Sidekiq in this app.

@@ -42,6 +42,48 @@ class AgentRunJobTest < ActiveSupport::TestCase
     end
   end
 
+  # Stands in for a robot on the claude_code provider: no RubyLLM tool
+  # callbacks fire; the provider's on_event hook gets Claude Code's stream
+  # events instead.
+  TOOL_USE_EVENT = {
+    "type" => "assistant",
+    "message" => { "content" => [{ "type" => "tool_use", "id" => "toolu_1", "name" => "mcp__task__read_task_doc",
+                                   "input" => {} }] }
+  }.freeze
+  TOOL_RESULT_EVENT = {
+    "type" => "user",
+    "message" => { "content" => [{ "type" => "tool_result", "tool_use_id" => "toolu_1", "content" => "the doc" }] }
+  }.freeze
+
+  class FakeClaudeCodeRobot < FakeRobot
+    attr_reader :provider_options, :build_kwargs
+
+    def initialize(**kwargs)
+      super
+      @build_kwargs = kwargs
+      @provider_options = { top_p: 0.9 }
+    end
+
+    def chat
+      self
+    end
+
+    def with_provider_options(options)
+      @provider_options = options
+      self
+    end
+
+    def run(message, **options)
+      @ran_message = message
+      @run_options = options
+      on_event = @provider_options.dig(:claude_code, :on_event)
+      on_event.call(TOOL_USE_EVENT)
+      on_event.call(TOOL_RESULT_EVENT)
+      @on_content.call(FakeChunk.new("Planned.", nil))
+      "final reply"
+    end
+  end
+
   def setup
     @repo_dir = Dir.mktmpdir("agent_run_job_test_repo")
     Dir.chdir(@repo_dir) { system("git", "init", "--quiet") }
@@ -271,5 +313,79 @@ class AgentRunJobTest < ActiveSupport::TestCase
     captured = captured_mcp_servers(@agent_run.id, normalizer: ->(*) { raise "should not be called for a non-review agent" })
 
     assert_equal [], captured
+  end
+
+  def claude_code_run(agent_type)
+    @agent_run.update!(status: "completed")
+    AgentRun.create!(
+      task: @task,
+      conversation: Conversation.create!(task: @task, provider: "claude_code", model: "sonnet", started_at: Time.current),
+      agent_type:,
+      status: "running"
+    )
+  end
+
+  def perform_claude_code(run)
+    robot = nil
+    RobotLab.stub(:build, ->(**kwargs) { robot = FakeClaudeCodeRobot.new(**kwargs) }) do
+      AgentRunJob.perform_now(run.id)
+    end
+    robot
+  end
+
+  test "a claude_code run gets no RubyLLM tools or MCP servers, and runs with none selected" do
+    robot = perform_claude_code(claude_code_run("planning"))
+
+    assert_equal [], robot.local_tools
+    assert_equal [], robot.mcp
+    assert_equal({ tools: :none, mcp: :none }, robot.run_options)
+    assert_includes robot.build_kwargs[:system_prompt], "mcp__task__read_task_doc"
+  end
+
+  test "a claude_code run hands the CLI the task worktree, a long timeout and its stage's tools" do
+    run = claude_code_run("planning")
+    options = perform_claude_code(run).provider_options
+
+    assert_equal 0.9, options[:top_p], "existing provider options are kept"
+    cli = options[:claude_code]
+    assert_equal @task.effective_cwd, cli[:cwd]
+    assert_equal AgentRunJob::CLAUDE_CODE_TIMEOUT, cli[:timeout]
+    assert_nil cli[:permission_mode]
+
+    args = cli[:args]
+    assert_equal "Read,Glob,Grep", args[args.index("--tools") + 1]
+    assert_equal "Read,Glob,Grep,mcp__task", args[args.index("--allowedTools") + 1]
+    assert_includes args, "--strict-mcp-config"
+    assert_equal "project,local", args[args.index("--setting-sources") + 1]
+
+    server = JSON.parse(args[args.index("--mcp-config") + 1]).dig("mcpServers", "task")
+    assert_equal Rails.root.join("bin/task_mcp").to_s, server["command"]
+    assert_equal [run.id.to_s], server["args"]
+    assert File.absolute_path?(server.dig("env", "BUNDLE_GEMFILE"))
+  end
+
+  test "a claude_code implementation run accepts edits" do
+    options = perform_claude_code(claude_code_run("implementation")).provider_options
+
+    assert_equal "acceptEdits", options.dig(:claude_code, :permission_mode)
+  end
+
+  test "Claude Code's tool events reach the transcript and the run completes" do
+    run = claude_code_run("planning")
+    perform_claude_code(run)
+
+    assert run.reload.completed?
+    rows = run.conversation.messages.order(:seq)
+    assert_equal %w[tool_use tool_result assistant], rows.pluck(:msg_type)
+    assert_equal "mcp__task__read_task_doc", rows.first.payload["tool_name"]
+    assert_equal "toolu_1", rows.second.payload["tool_use_id"]
+  end
+
+  test "a claude_code run flagged cancel_requested is stopped from the event hook" do
+    run = claude_code_run("planning")
+    run.update!(cancel_requested: true)
+    perform_claude_code(run)
+
+    assert_equal "cancelled", run.reload.status
   end
 end

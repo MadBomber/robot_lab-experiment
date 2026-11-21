@@ -55,8 +55,11 @@ class TranscriptRecorder
     persist(:tool_use, { tool_use_id: tool_call.id, tool_name: tool_call.name, tool_input: tool_call.arguments })
   end
 
-  def record_tool_result(result)
-    persist(:tool_result, { tool_use_id: @pending_tool_call&.id, content: result.to_s })
+  # tool_use_id: given when the caller knows which call this answers (Claude
+  # Code reports it, and may issue several calls before their results);
+  # otherwise the most recent call is assumed.
+  def record_tool_result(result, tool_use_id: nil)
+    persist(:tool_result, { tool_use_id: tool_use_id || @pending_tool_call&.id, content: result.to_s })
   end
 
   private

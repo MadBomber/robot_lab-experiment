@@ -5,11 +5,12 @@
 # which runs after robot_lab's own gem-load-time config application and
 # layers on top of it rather than replacing it.
 RubyLLM.configure do |config|
-  # /v1 is required -- RubyLLM's Ollama provider (a thin OpenAI subclass) has
-  # no fallback for this the way OpenAI's own provider does (its api_base
-  # defaults to "https://api.openai.com/v1"); Ollama's own OpenAI-compat
-  # server only listens on /v1/chat/completions, not bare /chat/completions.
-  config.ollama_api_base = ENV.fetch("ROBOT_LAB_RUBY_LLM__OLLAMA_API_BASE", "http://localhost:11434/v1")
+  # Local model servers (see the provider gems in the Gemfile). Each provider
+  # already defaults to its local server -- LM Studio at
+  # http://localhost:1234/v1, apfel at http://127.0.0.1:11434/v1 -- so these
+  # only override when the env var is set.
+  config.lms_api_base   = ENV["ROBOT_LAB_RUBY_LLM__LMS_API_BASE"]   if ENV["ROBOT_LAB_RUBY_LLM__LMS_API_BASE"]
+  config.apfel_api_base = ENV["ROBOT_LAB_RUBY_LLM__APFEL_API_BASE"] if ENV["ROBOT_LAB_RUBY_LLM__APFEL_API_BASE"]
 
   # RubyLLM does not auto-populate this from ENV the way it does for some
   # other providers -- OpenRouter::configuration_requirements demands it be

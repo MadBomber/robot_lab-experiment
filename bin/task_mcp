@@ -1,0 +1,29 @@
+#!/usr/bin/env ruby
+# The task MCP server for one claude_code agent run: serves that run's
+# bridge tools (AgentToolset#bridge_tools -- task doc, completion flags,
+# quality gate, GitHub issues) over stdio. Claude Code starts it from the
+# --mcp-config AgentRunJob passes, so it lives exactly as long as the run.
+#
+#   bin/task_mcp AGENT_RUN_ID
+#
+# It records nothing in the transcript: the job's ClaudeCodeEventBridge
+# already sees every call through Claude Code's own event stream, and a
+# second writer would race the recorder for message seq numbers.
+
+run_id = ARGV.fetch(0) { abort "usage: bin/task_mcp AGENT_RUN_ID" }
+
+Dir.chdir(File.expand_path("..", __dir__))
+
+# stdout carries the MCP protocol, so nothing else may write to it: boot
+# with stdout pointed at stderr, then hand it back to the transport.
+protocol_out = $stdout
+$stdout = $stderr
+require_relative "../config/environment"
+require "mcp"
+
+agent_run = AgentRun.find(run_id)
+tools = AgentToolset.new(agent_run:).bridge_tools.map { McpToolAdapter.wrap(it) }
+server = MCP::Server.new(name: AgentToolset::MCP_SERVER, version: "1.0.0", tools:)
+
+$stdout = protocol_out
+MCP::Server::Transports::StdioTransport.new(server).open

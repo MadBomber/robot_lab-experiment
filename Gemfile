@@ -51,6 +51,22 @@ gem "json", "~> 3.0"
 
 # Use the database-backed adapters for Rails.cache, Active Job, and Action Cable
 gem "ruby_llm"
+# Local model servers offered in the project LLM picker (Project.llm_options):
+# LM Studio (lms server start, port 1234) and Apple's on-device model via
+# apfel (apfel --serve, port 11434). robot_lab already depends on both but
+# never requires them; requiring them here registers the :lms and :apfel
+# providers with RubyLLM at boot.
+gem "ruby_llm-providers-apfel", require: "ruby_llm/providers/apfel"
+gem "ruby_llm-providers-lms", require: "ruby_llm/providers/lms"
+# Claude Code (`claude -p`) as a provider. 0.0.2 adds the on_event hook and
+# kill-on-raise that AgentRunJob relies on to watch and stop its tool calls.
+# Gemfile.local re-declares it as a path: gem.
+unless File.basename(ENV.fetch("BUNDLE_GEMFILE", "Gemfile")) == "Gemfile.local"
+  gem "ruby_llm-providers-claude_code", "~> 0.0.2", require: "ruby_llm/providers/claude_code"
+end
+# MCP server SDK for bin/task_mcp, which serves the app's task tools to
+# Claude Code runs (required where it's used, not at boot).
+gem "mcp", "~> 1.8", require: false
 gem "solid_cable"
 gem "solid_cache"
 gem "solid_queue"

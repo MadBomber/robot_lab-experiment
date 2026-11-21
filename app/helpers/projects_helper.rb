@@ -7,7 +7,7 @@ module ProjectsHelper
   # True when the project has no override, or its override still appears in
   # the live options list. False means the combobox's real options can't
   # represent the stored value (e.g. the model rolled off RubyLLM's registry,
-  # or the project's Ollama server no longer has it pulled) -- the caller
+  # or the local model server no longer has it installed) -- the caller
   # should inject a synthetic option rather than let the picker silently
   # fall back to "App default" while the DB still holds an override.
   def current_llm_pair_listed?(project, options)

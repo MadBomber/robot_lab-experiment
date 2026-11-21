@@ -146,6 +146,14 @@ class TranscriptRecorderTest < ActiveSupport::TestCase
     assert calls[1].dig(:locals, :message).tool_result?
   end
 
+  test "record_tool_result pairs with an explicit tool_use_id over the pending call" do
+    @recorder.record_tool_call(RubyLLM::ToolCall.new(id: "t1", name: "read_file", arguments: {}))
+    @recorder.record_tool_call(RubyLLM::ToolCall.new(id: "t2", name: "grep", arguments: {}))
+    @recorder.record_tool_result("first", tool_use_id: "t1")
+
+    assert_equal "t1", @conversation.messages.order(:seq).last.payload["tool_use_id"]
+  end
+
   test "record_tool_result persists a message with nil tool_use_id when no tool call is pending" do
     @recorder.record_tool_result("orphan result")
 
